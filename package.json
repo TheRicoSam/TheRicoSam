@@ -1,0 +1,1 @@
+{"type":"module","name":"la-precisa-eta","private":true,"scripts":{"test":"node --test","backtest":"node scripts/backtest.js"}}
