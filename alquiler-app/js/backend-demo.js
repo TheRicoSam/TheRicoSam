@@ -84,6 +84,11 @@ export async function signUp({ name, phone, email, password }) {
   db.users.push(u); setSession(u.uid); save();
 }
 
+export async function signInName({ name }) {
+  const u = { uid: uid(), name: name.trim(), phone: '', email: '', password: null, createdAt: Date.now() };
+  db.users.push(u); setSession(u.uid); save();
+}
+
 export async function signInGoogle() { throw new Error('El acceso con Google se activa al conectar Firebase.'); }
 export async function resetPassword() { throw new Error('En modo demo no se envían correos.'); }
 export async function signOut() { setSession(null); emitAll(); }

@@ -53,7 +53,7 @@ Usa los botones "Soy el dueño" / "Soy cliente". Para ver el tiempo real, abre d
 ## Ponerla en línea (tiempo real entre todos los celulares)
 
 1. Entra a <https://console.firebase.google.com>, crea un proyecto y agrega una **app web** (`</>`). Copia la configuración en `firebase-config.js` › `FIREBASE_CONFIG`.
-2. **Authentication** › Método de acceso: activa **Correo/contraseña** y **Google**.
+2. **Authentication** › Método de acceso: activa **Anónimo** (para que tus clientes entren solo con su nombre) y **Google** (para ti, el dueño).
 3. **Firestore Database** › Crear base de datos (región `southamerica-east1`, São Paulo).
 4. **Storage** › Comenzar (para las fotos).
 5. Tu correo de dueño, el nombre Data Crammer y el WhatsApp 76499536 ya están configurados (`firebase-config.js`, `firestore.rules`, `storage.rules`, `functions/index.js`). Si cambias de correo, cámbialo en esos 4 archivos.

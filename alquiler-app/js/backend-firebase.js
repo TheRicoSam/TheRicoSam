@@ -31,6 +31,8 @@ const ERR = {
   'auth/invalid-email': 'El correo no es válido.',
   'auth/popup-closed-by-user': 'Se cerró la ventana de Google.',
   'auth/network-request-failed': 'Sin conexión a internet.',
+  'auth/operation-not-allowed': 'Falta activar el acceso anónimo en Firebase (Authentication › Anónimo).',
+  'auth/admin-restricted-operation': 'Falta activar el acceso anónimo en Firebase (Authentication › Anónimo).',
   'permission-denied': 'No tienes permiso para hacer esto.',
 };
 const nice = (e) => new Error(ERR[e?.code] || e?.message || 'Ocurrió un error');
@@ -44,16 +46,17 @@ export function onAuth(cb) {
       const snap = await F.getDoc(F.doc(db, 'users', u.uid));
       profile = snap.exists() ? snap.data() : {};
       if (!snap.exists()) {
-        await F.setDoc(F.doc(db, 'users', u.uid), { name: u.displayName || '', email: u.email, phone: '', createdAt: Date.now() }, { merge: true });
+        profile = { name: pendingName || u.displayName || '', phone: '', createdAt: Date.now() };
+        await F.setDoc(F.doc(db, 'users', u.uid), profile, { merge: true });
       }
-      if (profile.emailLower !== (u.email || '').toLowerCase()) {
+      if (u.email && profile.emailLower !== u.email.toLowerCase()) {
         await F.setDoc(F.doc(db, 'users', u.uid), { email: u.email, emailLower: (u.email || '').toLowerCase() }, { merge: true });
       }
     } catch { /* sin conexión: se usa el caché */ }
     me = {
       uid: u.uid,
       email: u.email,
-      name: profile.name || u.displayName || (u.email || '').split('@')[0],
+      name: profile.name || pendingName || u.displayName || (u.email || '').split('@')[0] || 'Cliente',
       phone: profile.phone || '',
       role: admins.includes((u.email || '').toLowerCase()) ? 'admin' : 'client',
     };
@@ -61,6 +64,15 @@ export function onAuth(cb) {
   });
 }
 
+// Clientes: entran solo con su nombre (cuenta anónima guardada en su celular).
+let pendingName = '';
+export const signInName = wrap(async ({ name }) => {
+  pendingName = name.trim();
+  const cred = await A.signInAnonymously(auth);
+  await A.updateProfile(cred.user, { displayName: pendingName });
+  await F.setDoc(F.doc(db, 'users', cred.user.uid), { name: pendingName }, { merge: true });
+  if (me && me.uid === cred.user.uid) me.name = pendingName;
+});
 export const signIn = wrap(({ email, password }) => A.signInWithEmailAndPassword(auth, email.trim(), password));
 export const signUp = wrap(async ({ name, phone, email, password }) => {
   const cred = await A.createUserWithEmailAndPassword(auth, email.trim(), password);

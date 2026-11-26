@@ -195,7 +195,7 @@ function renderShell() {
     </div>
     <nav class="tabbar">${tabs.map(([v, t, ic]) => `<a href="#/${v}" data-v="${v}">${icon(ic)}<span>${v === 'mis-reservas' ? 'Reservas' : t}</span>${v === 'reservas' || v === 'mis-reservas' ? '<span class="dot hidden" data-badge></span>' : ''}</a>`).join('')}</nav>
   </div>`;
-  $('#logout').onclick = async () => { if (await confirmDialog({ title: '¿Cerrar sesión?', ok: 'Cerrar sesión' })) api.signOut(); };
+  $('#logout').onclick = doSignOut;
   addEventListener('scroll', () => $('#topbar')?.classList.toggle('scrolled', scrollY > 4), { passive: true });
   paintConn(); paintBadges();
 }
@@ -717,7 +717,7 @@ function vPerfil(el) {
   const admin = isAdmin();
   el.innerHTML = `<div class="fade-in grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:start">
     <div class="card pad col">
-      <div class="row">${avatar(S.user.name, 56)}<div><h2>${esc(S.user.name)}</h2><div class="small muted">${esc(S.user.email)} · ${admin ? 'Administrador' : 'Cliente'}</div></div></div>
+      <div class="row">${avatar(S.user.name, 56)}<div><h2>${esc(S.user.name)}</h2><div class="small muted">${[admin ? esc(S.user.email) : '', admin ? 'Administrador' : 'Cliente'].filter(Boolean).join(' · ')}</div></div></div>
       <div class="field"><label>Nombre</label><input class="input" id="p-n" value="${esc(S.user.name)}"></div>
       <div class="field"><label>Celular / WhatsApp</label><input class="input" id="p-p" type="tel" value="${esc(S.user.phone)}" placeholder="7XXXXXXX"></div>
       <button class="btn" id="p-save">Guardar cambios</button>
@@ -748,7 +748,7 @@ function vPerfil(el) {
     catch (e) { toast('No se pudo guardar', e.message, 'bad'); }
   };
   el.querySelector('#p-test')?.addEventListener('click', () => notify('Así se verán tus avisos', 'Ejemplo: "Empieza en 15 min · Data en Cala Cala"', { tag: 'test' }));
-  el.querySelector('#p-out').onclick = () => api.signOut();
+  el.querySelector('#p-out').onclick = doSignOut;
   el.querySelector('#p-reset')?.addEventListener('click', async () => { if (await confirmDialog({ title: '¿Reiniciar la demo?', text: 'Se borrarán los datos de prueba de este navegador.', ok: 'Reiniciar', danger: true })) api.resetDemo(); });
 }
 
@@ -760,6 +760,7 @@ function vInicio(el) {
   const services = S.services.filter((s) => s.active !== false);
   el.innerHTML = `<div class="fade-in">
     ${notifBanner()}
+    ${installCard().replace('class="banner', 'style="margin-bottom:20px" class="banner')}
     <section class="hero">
       <div class="eyebrow">${icon('pin', 'sm')} Cochabamba · Sacaba · Vinto</div>
       <h1 style="font-size:clamp(28px,4.4vw,46px);max-width:680px">Que tu presentación <span style="color:var(--hl)">se vea en grande.</span></h1>
@@ -783,7 +784,7 @@ function vInicio(el) {
       <div><h3>¿Tienes dudas o quieres la promoción?</h3><p class="muted small">Escríbenos al ${esc(CFG.whatsappDisplay || CFG.whatsapp)} y te ayudamos.</p></div>
       <a class="btn btn-wa" href="${waLink(CFG.whatsapp, `Hola ${BIZ}, quiero consultar sobre un alquiler.`)}" target="_blank" rel="noopener">${icon('chat', 'sm')} WhatsApp</a>
     </div></div>`;
-  bindOpen(el); bindNotif(el);
+  bindOpen(el); bindNotif(el); bindInstall(el);
   el.querySelectorAll('[data-s]').forEach((c) => c.onclick = (e) => { if (!e.target.closest('a')) showService(svcById(c.dataset.s)); });
   el.querySelectorAll('[data-w]').forEach((c) => c.onclick = () => { const w = S.works.find((x) => x.id === c.dataset.w); lightbox(w.photos, 0, w.title); });
 }
@@ -962,56 +963,87 @@ function vReservar(el, params) {
 // =====================================================================
 //                               ACCESO
 // =====================================================================
-function renderAuth(tab = 'in') {
+function renderAuth(owner = false) {
   root.innerHTML = `<div class="auth">
     <section class="auth-art">
       <div class="brand" style="padding:0"><div class="brand-mark"></div><div><div class="brand-name">${esc(BIZ)}</div><div class="brand-sub">${esc(CFG.tagline || '')}</div></div></div>
-      <div><h1>Que tu presentación <em>se vea en grande.</em></h1><p style="margin-top:14px;font-size:17px;color:#a5b4c8;max-width:480px">Alquiler de data (proyectores) en Cochabamba, Sacaba y Vinto. Reserva en línea y recibe la confirmación al instante.</p>
+      <div><h1>Que tu presentación <em>se vea en grande.</em></h1><p style="margin-top:14px;font-size:17px;color:#a5b4c8;max-width:480px">Alquiler de data (proyectores) en Cochabamba, Sacaba, Quillacollo, Vinto y alrededores. Reserva desde tu celular y recibe la confirmación al instante.</p>
         <div class="feats">
-          <div class="feat"><div class="ico">${icon('projector')}</div><div><b>Reserva en 4 pasos</b><span>Proyector, fecha, lugar y listo.</span></div></div>
+          <div class="feat"><div class="ico">${icon('projector')}</div><div><b>Reserva en 4 pasos</b><span>Data, fecha, lugar y listo.</span></div></div>
           <div class="feat"><div class="ico">${icon('map')}</div><div><b>Mapa detallado de Cochabamba</b><span>Marca la ubicación exacta: calles, zonas y satélite.</span></div></div>
           <div class="feat"><div class="ico">${icon('bell')}</div><div><b>Confirmación y recordatorios</b><span>Avisos al confirmar, 1 día antes y 15 minutos antes.</span></div></div>
         </div></div>
       <div class="small" style="color:#5b6984">© ${new Date().getFullYear()} ${esc(BIZ)} · Cochabamba, Bolivia</div>
     </section>
     <section class="auth-form"><div class="auth-card">
-      <div><h2 style="font-size:26px">${tab === 'in' ? 'Bienvenido' : 'Crea tu cuenta'}</h2><p class="muted">${tab === 'in' ? 'Ingresa para reservar o ver tus reservas.' : 'Solo te tomará un momento.'}</p></div>
-      <div class="seg" style="width:100%"><button style="flex:1" class="${tab === 'in' ? 'on' : ''}" data-tab="in">Iniciar sesión</button><button style="flex:1" class="${tab === 'up' ? 'on' : ''}" data-tab="up">Registrarme</button></div>
-      ${ONLINE_MODE ? `<button class="btn ghost block lg" id="g">${googleLogo} Continuar con Google</button><div class="divider">o con tu correo</div>` : ''}
+      ${owner ? `
+      <div><h2 style="font-size:26px">Acceso del dueño</h2><p class="muted">Solo para administrar las reservas.</p></div>
+      ${ONLINE_MODE ? `<button class="btn ghost block lg" id="g">${googleLogo} Entrar con Google</button>`
+        : `<button class="btn dark block lg" data-demo="owner">${icon('dashboard', 'sm')} Entrar como dueño (demo)</button>`}
+      <button type="button" class="small" id="back" style="background:none;border:0;color:var(--brand);cursor:pointer;font-weight:600">← Volver</button>`
+      : `
+      <div><h2 style="font-size:28px">¡Bienvenido! 👋</h2><p class="muted" style="margin-top:4px">Escribe tu nombre completo para reservar un data. <b>No necesitas correo ni contraseña.</b></p></div>
       <form class="col" id="f" novalidate>
-        ${tab === 'up' ? `<div class="field"><label>Nombre completo</label><input class="input" name="name" required autocomplete="name"></div>
-        <div class="field"><label>Celular / WhatsApp</label><input class="input" name="phone" type="tel" required placeholder="7XXXXXXX" autocomplete="tel"></div>` : ''}
-        <div class="field"><label>Correo electrónico</label><input class="input" name="email" type="email" required autocomplete="email"></div>
-        <div class="field"><label>Contraseña</label><input class="input" name="password" type="password" required minlength="6" autocomplete="${tab === 'in' ? 'current-password' : 'new-password'}"></div>
-        <button class="btn lg block" type="submit">${tab === 'in' ? 'Ingresar' : 'Crear cuenta'}</button>
-        ${tab === 'in' && ONLINE_MODE ? '<button type="button" class="small" id="forgot" style="background:none;border:0;color:var(--brand);cursor:pointer;font-weight:600">¿Olvidaste tu contraseña?</button>' : ''}
+        <div class="field"><label for="nm">Nombre completo</label><input class="input" id="nm" name="name" required autocomplete="name" placeholder="Ej.: María Fernández" style="height:54px;font-size:17px"></div>
+        <button class="btn lg block" type="submit">Entrar ${icon('arrow', 'sm')}</button>
       </form>
-      ${!ONLINE_MODE ? `<div class="demo-box"><div class="row"><span class="badge st-pendiente plain">Modo demo</span><span class="small muted">Prueba la app con un clic</span></div>
-        <div class="row"><button class="btn soft" style="flex:1" data-demo="client">${icon('user', 'sm')} Soy cliente</button><button class="btn dark" style="flex:1" data-demo="owner">${icon('dashboard', 'sm')} Soy el dueño</button></div>
-        <p class="tiny muted">Abre la app en dos pestañas (una como dueño y otra como cliente) para ver cómo se actualiza en tiempo real.</p></div>` : ''}
+      <div class="divider">o</div>
+      <a class="btn btn-wa block lg" href="${waLink(CFG.whatsapp, `Hola ${BIZ}, quiero alquilar un data.`)}" target="_blank" rel="noopener">${icon('chat', 'sm')} Escríbenos por WhatsApp${CFG.whatsappDisplay ? ` · ${esc(CFG.whatsappDisplay)}` : ''}</a>
+      ${installCard()}
+      ${!ONLINE_MODE ? `<div class="demo-box"><div class="row"><span class="badge st-pendiente plain">Modo demo</span><span class="small muted">Para probar</span></div>
+        <button class="btn soft" data-demo="client">${icon('user', 'sm')} Entrar como cliente de ejemplo</button></div>` : ''}
+      <button type="button" class="tiny muted" id="own" style="background:none;border:0;cursor:pointer;margin-top:6px">Acceso del dueño</button>`}
     </div></section></div>`;
-  root.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => renderAuth(b.dataset.tab));
   const run = async (fn, btn) => {
     const old = btn.innerHTML; btn.disabled = true; btn.textContent = 'Un momento…';
-    try { await fn(); } catch (e) { toast('No se pudo ingresar', e.message, 'bad'); btn.disabled = false; btn.innerHTML = old; }
+    try { await fn(); } catch (e) { toast('No se pudo entrar', e.message, 'bad'); btn.disabled = false; btn.innerHTML = old; }
   };
-  root.querySelector('#f').onsubmit = (e) => {
+  root.querySelector('#own')?.addEventListener('click', () => renderAuth(true));
+  root.querySelector('#back')?.addEventListener('click', () => renderAuth(false));
+  root.querySelector('#f')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const d = Object.fromEntries(new FormData(e.target));
-    if (!d.email || !d.password) return toast('Completa correo y contraseña', '', 'bad');
-    if (tab === 'up' && (!d.name?.trim() || (d.phone || '').replace(/\D/g, '').length < 7)) return toast('Escribe tu nombre y un celular válido', '', 'bad');
-    run(() => (tab === 'in' ? api.signIn(d) : api.signUp(d)), e.target.querySelector('[type=submit]'));
-  };
-  root.querySelector('#g')?.addEventListener('click', (e) => run(() => api.signInGoogle(), e.currentTarget));
-  root.querySelector('#forgot')?.addEventListener('click', async () => {
-    const email = root.querySelector('[name=email]').value;
-    if (!email) return toast('Escribe tu correo arriba', '', 'bad');
-    try { await api.resetPassword(email); toast('Te enviamos un correo', 'Revisa tu bandeja para crear una nueva contraseña.', 'ok'); } catch (err) { toast('No se pudo enviar', err.message, 'bad'); }
+    const name = root.querySelector('#nm').value.replace(/\s+/g, ' ').trim();
+    if (name.split(' ').length < 2 || name.length < 5) return toast('Escribe tu nombre y apellido', 'Así sabremos quién reserva.', 'bad');
+    run(() => api.signInName({ name }), e.target.querySelector('[type=submit]'));
   });
+  root.querySelector('#g')?.addEventListener('click', (e) => run(() => api.signInGoogle(), e.currentTarget));
+  bindInstall(root);
   root.querySelectorAll('[data-demo]').forEach((b) => b.onclick = async () => {
     const { DEMO_OWNER, DEMO_CLIENT } = await import('./backend-demo.js');
     run(() => api.signIn(b.dataset.demo === 'owner' ? DEMO_OWNER : DEMO_CLIENT), b);
   });
+}
+
+// ---------- instalar la app en el celular ----------
+let installEvt = null;
+const installCards = () => document.querySelectorAll('[data-install-card]');
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; installCards().forEach((c) => c.classList.remove('hidden')); });
+addEventListener('appinstalled', () => { installEvt = null; installCards().forEach((c) => c.classList.add('hidden')); toast('¡App instalada!', 'Ya la tienes en tu pantalla de inicio.', 'ok'); });
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+function installCard() {
+  if (isStandalone()) return '';
+  const show = installEvt || isIOS();
+  return `<div class="banner ${show ? '' : 'hidden'}" data-install-card><div class="ico">${icon('download')}</div>
+    <div style="flex:1"><b>Instala la app en tu celular</b><div class="small muted">Ábrela como cualquier app y recibe tus avisos.</div></div>
+    <button class="btn sm" type="button" data-install>Instalar</button></div>`;
+}
+function bindInstall(el) {
+  el.querySelectorAll('[data-install]').forEach((b) => b.onclick = async () => {
+    if (installEvt) { installEvt.prompt(); await installEvt.userChoice; installEvt = null; return; }
+    modal({
+      title: 'Instalar en tu celular',
+      body: isIOS()
+        ? `<ol style="margin:0;padding-left:20px;line-height:2"><li>Abre esta página en <b>Safari</b>.</li><li>Toca el botón <b>Compartir</b> (cuadrado con flecha hacia arriba).</li><li>Elige <b>"Agregar a inicio"</b> y toca <b>Agregar</b>.</li></ol>`
+        : `<ol style="margin:0;padding-left:20px;line-height:2"><li>Abre esta página en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> (arriba a la derecha).</li><li>Elige <b>"Instalar app"</b> o <b>"Agregar a pantalla principal"</b>.</li></ol>`,
+      foot: '<button class="btn" data-close>Entendido</button>',
+    });
+  });
+}
+
+async function doSignOut() {
+  const text = isAdmin() ? '' : 'Tus reservas quedan guardadas, pero para verlas otra vez en este celular tendrás que pedirnos ayuda por WhatsApp.';
+  if (await confirmDialog({ title: '¿Salir de la app?', text, ok: 'Salir', danger: !isAdmin() })) api.signOut();
 }
 
 // ---------- tablas de vistas ----------

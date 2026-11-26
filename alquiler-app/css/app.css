@@ -453,7 +453,7 @@ textarea.input { height: auto; min-height: 90px; padding: 12px 14px; resize: ver
 .demo-box { border: 1px dashed var(--line-strong); border-radius: 16px; padding: 14px; display: grid; gap: 10px; background: var(--surface-2); }
 @media (max-width: 900px) {
   .auth { grid-template-columns: 1fr; }
-  .auth-art { padding: 28px 22px 34px; padding-top: max(28px, env(safe-area-inset-top)); }
+  .auth-art { gap: 22px; padding: 28px 22px 34px; padding-top: max(28px, env(safe-area-inset-top)); }
   .auth-art h1 { font-size: 30px; }
   .auth-art .feats { display: none; }
   .auth-form { padding-top: 24px; align-items: start; }

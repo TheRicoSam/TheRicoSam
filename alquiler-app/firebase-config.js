@@ -11,7 +11,7 @@
  */
 self.APP_SETTINGS = {
   businessName: 'Data Crammer',
-  tagline: 'Alquiler de data (proyectores) · Cochabamba, Sacaba y Vinto',
+  tagline: 'Alquiler de data (proyectores) · Quillacollo, Cochabamba y alrededores',
   // Correo(s) del dueño: quien entre con este correo verá el panel de administración.
   adminEmails: ['samistotelesrico777@gmail.com'],
   // WhatsApp del negocio, con código de país y sin "+" (ej.: 59171234567).
