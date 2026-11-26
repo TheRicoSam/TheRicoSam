@@ -4,8 +4,9 @@
 import { uid, toMs, dayKey } from './ui.js';
 import { DEFAULT_SERVICES, DEFAULT_WORKS } from './defaults.js';
 import { sortWorks } from './sort.js';
+import { zoneOf } from './pricing.js';
 
-const KEY = 'datacrammer_demo_v3';
+const KEY = 'datacrammer_demo_v4';
 const SESSION = 'alq_demo_session';
 export const DEMO_OWNER = { email: 'dueno@demo.bo', password: 'demo1234' };
 export const DEMO_CLIENT = { email: 'cliente@demo.bo', password: 'demo1234' };
@@ -153,20 +154,20 @@ function seed() {
   const item = (s, qty) => ({ serviceId: s.id, name: s.name, price: s.price, qty, ...(s.perHour ? { perHour: true } : {}) });
   const mk = (id, uid_, name, phone, start, durH, items, location, status, extra = {}) => ({
     id, uid: uid_, clientName: name, clientPhone: phone, clientEmail: '', items,
-    total: items.reduce((t, i) => t + i.price * i.qty * (i.perHour ? durH : 1), 0) + (extra.extra || 0), start, end: start + durH * 3600e3,
-    extra: 0,
+    total: items.reduce((t, i) => t + i.price * i.qty * (i.perHour ? durH : 1), 0) + (zoneOf(location)?.fee || 0), start, end: start + durH * 3600e3,
+    extra: zoneOf(location)?.fee || 0, zone: zoneOf(location)?.name || null,
     location, notes: '', status, adminNote: '', createdAt: Date.now() - 864e5, updatedAt: Date.now() - 3600e3, ...extra,
   });
   const [data, promo] = services;
   const bookings = [
     mk('b1', 'client1', 'María Fernández', '71234567', soon, 3, [item(data, 1)],
       loc(-17.3712, -66.1636, 'Av. América esq. Pando, Cala Cala, Cochabamba', 'Colegio, entrada por la puerta lateral'), 'confirmado', { notes: 'Defensa de monografía, 4to piso', adminNote: 'Llegamos 30 min antes para instalar.' }),
-    mk('b2', 'c2', 'Jorge Rocha', '76543210', at(plusDays(1), '19:00'), 3, [item(data, 1), item(services[3], 1)],
-      loc(-17.4041, -66.0398, 'Plaza principal de Sacaba', 'Iglesia frente a la plaza'), 'pendiente', { notes: 'Culto de jóvenes, necesito cable HDMI largo' }),
+    mk('b2', 'c2', 'Jorge Rocha', '76543210', at(plusDays(1), '19:00'), 3, [item(data, 1), item(services[2], 1)],
+      loc(-17.4041, -66.0398, 'Plaza principal de Sacaba', 'Iglesia frente a la plaza'), 'pendiente', { notes: 'Culto de jóvenes, también necesito laptop' }),
     mk('b3', 'c3', 'Lucía Vargas', '70707070', at(plusDays(2), '09:00'), 4, [item(data, 1)],
-      loc(-17.3826, -66.2585, 'Av. Blanco Galindo km 13, Vinto', 'Salón de capacitación, portón negro'), 'confirmado', { notes: 'Taller para 40 personas', extra: 15, adminNote: 'Incluye 15 Bs de recargo por distancia (Vinto).' }),
+      loc(-17.3968, -66.3121, 'Plaza principal de Vinto', 'Salón de capacitación, portón negro'), 'confirmado', { notes: 'Taller para 40 personas' }),
     mk('b4', 'c4', 'Carlos Méndez', '72222222', at(plusDays(1), '15:00'), 2, [item(promo, 1)],
-      loc(-17.3936, -66.1450, 'Universidad, zona Las Cuadras, Cochabamba', 'Aula 204'), 'pendiente'),
+      loc(-17.3905, -66.2400, 'Colegio en Colcapirhua, Av. Blanco Galindo', 'Aula 204'), 'pendiente'),
     mk('b5', 'client1', 'María Fernández', '71234567', at(plusDays(-6), '10:00'), 2, [item(data, 1)],
       loc(-17.3936, -66.1570, 'Plaza 14 de Septiembre, Cochabamba', ''), 'completado'),
   ];

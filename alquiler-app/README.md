@@ -21,10 +21,22 @@ Una sola app web para el dueño y sus clientes. Se puede instalar en el celular 
 
 ## Precios
 
-- **Data (proyector): 34 Bs por hora.** La app multiplica por las horas reservadas y cobra la hora empezada (de 14:00 a 16:30 son 3 h = 102 Bs).
-- **Recargo por distancia:** al confirmar, la app te muestra a cuántos km (en línea recta) está el lugar desde tu base, y tú escribes el recargo. El cliente recibe el total final.
-- **Laptop y cable HDMI largo:** aparecen como "Consultar precio" hasta que les pongas precio en **Servicios › Editar**. Ahí también puedes marcar si un precio es por hora.
-- **Tu base:** en `firebase-config.js` › `base` pon las coordenadas de donde sales (ahora está la Plaza 14 de Septiembre). Para sacarlas, mantén presionado tu lugar en Google Maps y copia los dos números.
+- **Data (proyector): 34 Bs por hora.** **Laptop: 20 Bs por hora.** Se cobra la hora empezada (de 14:00 a 16:30 son 3 h).
+- **Recargo por distancia según la zona** (sales desde la Plaza Bolívar de Quillacollo):
+
+  | Zona | Recargo |
+  |---|---|
+  | Quillacollo | sin recargo |
+  | Vinto | 5 Bs |
+  | Colcapirhua | 10 Bs |
+  | Sipe Sipe | 15 Bs |
+  | Cochabamba | 15 Bs |
+  | Tiquipaya | 20 Bs |
+  | Sacaba | 20 Bs |
+  | Otras zonas (Tarata, Capinota, Punata…) | a consultar |
+
+  La app detecta la zona con el punto marcado en el mapa y suma el recargo al total. Al confirmar, puedes cambiar el monto. Las tarifas se editan en `firebase-config.js` › `zones`.
+- Para que un servicio diga "Consultar precio", pon su precio en 0 desde **Servicios › Editar**.
 
 ## Probarla ya (modo demo)
 

@@ -4,6 +4,7 @@ import {
   money, STATUS, statusBadge, waLink, telLink, gmapsDir, wazeDir,
 } from './ui.js';
 import { DEFAULT_SERVICES, DEFAULT_WORKS } from './defaults.js';
+import { BASE, hoursOf, lineAmount, calcTotal, kmFromBase, zoneOf } from './pricing.js';
 import { createMap, locationPicker, pinIcon, CBBA } from './map.js';
 import { registerSW, swRegistration, permission, askPermission, notify, startReminders, diffBookings, downloadICS } from './notify.js';
 
@@ -78,26 +79,17 @@ const upcoming = (list) => list.filter((b) => (b.end || b.start) > Date.now() &&
 const conflictsOf = (b) => S.bookings.filter((o) => o.id !== b.id && o.status === 'confirmado' && o.start < (b.end || b.start) && b.start < (o.end || o.start));
 const priceTag = (s) => (s.price > 0 ? `${money(s.price, CUR)} <small>${esc(s.unit || '')}</small>` : '<span style="font-size:15px">Consultar precio</span>');
 // Precios: los servicios "por hora" se multiplican por las horas reservadas (se cobra la hora empezada).
-const hoursOf = (start, end) => (start && end && end > start ? Math.ceil((end - start) / 3600e3 - 1e-9) : null);
 const fmtH = (h) => `${h} h`;
-const lineAmount = (i, hours) => (i.price || 0) * i.qty * (i.perHour ? (hours ?? i.hours ?? 1) : 1);
 const lineMoney = (i, hours) => {
   if (!(i.price > 0)) return 'A consultar';
   const h = hours ?? i.hours;
   if (i.perHour && !h) return `${money(i.price * i.qty, CUR)} / hora`;
   return `${money(lineAmount(i, h), CUR)}${i.perHour ? ` · ${fmtH(h)}` : ''}`;
 };
-const calcTotal = (items, start, end, extra = 0) => (items || []).reduce((t, i) => t + lineAmount(i, hoursOf(start, end)), 0) + (+extra || 0);
 const hasConsult = (items) => (items || []).some((i) => !(i.price > 0));
-// Distancia en línea recta desde tu base (configurable en firebase-config.js › base).
-const BASE = CFG.base || { lat: -17.3935, lng: -66.157, name: 'la Plaza 14 de Septiembre' };
-function kmFromBase(loc) {
-  if (!loc?.lat) return null;
-  const R = 6371, r = (x) => (x * Math.PI) / 180;
-  const dLat = r(loc.lat - BASE.lat), dLng = r(loc.lng - BASE.lng);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(r(BASE.lat)) * Math.cos(r(loc.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
+// Línea del recargo por zona (zone: nombre o null; extra: monto).
+const surchargeLine = (zone, extra, known = true) =>
+  `<div class="row" style="justify-content:space-between;margin-top:6px"><span class="strong" style="font-weight:600">Recargo por distancia${zone ? ` (${esc(zone)})` : ''}</span><span class="muted small">${!known ? 'A consultar' : extra > 0 ? money(extra, CUR) : 'Sin recargo'}</span></div>`;
 const kmText = (loc) => { const k = kmFromBase(loc); return k == null ? '' : `≈ ${k < 10 ? k.toFixed(1) : Math.round(k)} km`; };
 const tones = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'];
 const toneOf = (s, i = 0) => s.tone || tones[i % tones.length];
@@ -291,9 +283,9 @@ function openBooking(id) {
         <div class="dl full"><div class="k">${icon('pin', 'sm')} Dirección</div><div class="v">${esc(b.location?.address || '—')}</div>${b.location?.reference ? `<div class="small muted" style="margin-top:4px">Referencia: ${esc(b.location.reference)}</div>` : ''}${admin && kmFromBase(b.location) != null ? `<div class="small" style="margin-top:4px;color:var(--brand);font-weight:700">${kmText(b.location)} en línea recta desde ${esc(BASE.name)}</div>` : ''}</div>
         <div class="dl full"><div class="k">${icon('box', 'sm')} Servicios</div>
           ${(b.items || []).map((i) => `<div class="row" style="justify-content:space-between;margin-top:6px"><span class="strong" style="font-weight:600">${i.qty} × ${esc(i.name)}</span><span class="muted small">${lineMoney(i, hoursOf(b.start, b.end))}</span></div>`).join('')}
-          ${b.extra > 0 ? `<div class="row" style="justify-content:space-between;margin-top:6px"><span class="strong" style="font-weight:600">Recargo por distancia</span><span class="muted small">${money(b.extra, CUR)}</span></div>` : ''}
+          ${surchargeLine(b.zone, b.extra, b.status !== 'pendiente' || !!b.zone || b.extra > 0)}
           <div class="row" style="justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line-strong)"><b>${b.status === 'pendiente' ? 'Total referencial' : 'Total'}</b><b class="price">${money(b.total, CUR)}${hasConsult(b.items) ? ' <small>+ extras a consultar</small>' : ''}</b></div>
-          ${b.status === 'pendiente' && !admin ? '<div class="tiny muted" style="margin-top:6px">Si el lugar está lejos se suma un recargo por distancia; te lo indicamos al confirmar.</div>' : ''}</div>
+          ${b.status === 'pendiente' && !admin && !b.zone ? '<div class="tiny muted" style="margin-top:6px">Tu zona no tiene tarifa fija: te indicamos el recargo al confirmar.</div>' : ''}</div>
         ${b.notes ? `<div class="dl full"><div class="k">${icon('edit', 'sm')} Notas del cliente</div><div class="v" style="font-weight:500">${esc(b.notes)}</div></div>` : ''}
       </div>
       ${lat ? `<div class="map" id="d-map" style="height:240px;margin-top:14px"></div>
@@ -362,11 +354,11 @@ function confirmBooking(b) {
       ${conf.length ? `<div class="banner warn"><div class="ico">${icon('alert')}</div><div class="small"><b>Se cruza con ${conf.map((c) => `${esc(c.clientName)} (${time(c.start)}–${time(c.end)})`).join(', ')}</b><br>Puedes confirmar igual si tienes otro equipo.</div></div>` : ''}
       <div class="detail-grid">
         <div class="dl"><div class="k">${icon('user', 'sm')} Cliente</div><div class="v">${esc(b.clientName)}</div><div class="tiny muted">${dayLong(b.start)} · ${time(b.start)}–${time(b.end)} (${fmtH(hours)})</div></div>
-        <div class="dl"><div class="k">${icon('pin', 'sm')} Distancia</div><div class="v">${kmText(b.location) || '—'}</div><div class="tiny muted">en línea recta desde ${esc(BASE.name)}</div></div>
+        <div class="dl"><div class="k">${icon('pin', 'sm')} Distancia</div><div class="v">${b.zone ? `${esc(b.zone)} · ` : 'Zona sin tarifa · '}${kmText(b.location) || '—'}</div><div class="tiny muted">en línea recta desde ${esc(BASE.name)}</div></div>
       </div>
       <div class="dl">${(b.items || []).map((i) => `<div class="row" style="justify-content:space-between"><span>${i.qty} × ${esc(i.name)}</span><span class="muted small">${lineMoney(i, hours)}</span></div>`).join('')}</div>
       <div class="form-grid">
-        <div class="field"><label>Recargo por distancia (${CUR})</label><input class="input" id="cb-x" type="number" min="0" step="1" value="${b.extra || 0}"><span class="hint">0 si está cerca.</span></div>
+        <div class="field"><label>Recargo por distancia (${CUR})</label><input class="input" id="cb-x" type="number" min="0" step="1" value="${b.extra || 0}"><span class="hint">${b.zone ? `Tarifa de ${esc(b.zone)}: ${money((zoneOf(b.location) || {}).fee ?? b.extra ?? 0, CUR)}. Puedes cambiarlo.` : 'Esta zona no tiene tarifa: escribe el recargo.'}</span></div>
         <div class="field"><label>Total a cobrar</label><div class="input" id="cb-t" style="display:flex;align-items:center;font-weight:800;background:var(--surface-2)"></div>${hasConsult(b.items) ? '<span class="hint">Hay extras "a consultar": súmalos en el recargo o escríbelos en el mensaje.</span>' : ''}</div>
         <div class="field full"><label>Mensaje para el cliente (opcional)</label><textarea class="input" id="cb-n" placeholder="Ej.: Llegamos 30 min antes para instalar."></textarea></div>
       </div></div>`,
@@ -830,7 +822,8 @@ function vReservar(el, params) {
   let pickMap = null;
 
   const items = () => Object.entries(W.qty).filter(([, q]) => q > 0).map(([id, qty]) => { const s = svcById(id); return s && { serviceId: id, name: s.name, price: s.price || 0, qty, ...(s.perHour ? { perHour: true } : {}) }; }).filter(Boolean);
-  const total = () => calcTotal(items(), startMs(), endMs());
+  const zone = () => zoneOf(W.location);
+  const total = () => calcTotal(items(), startMs(), endMs(), zone()?.fee || 0);
   const startMs = () => (W.date && W.start ? toMs(W.date, W.start) : null);
   const endMs = () => { if (!W.date || !W.end) return null; let e = toMs(W.date, W.end); if (e <= startMs()) e += 864e5; return e; };
 
@@ -838,10 +831,10 @@ function vReservar(el, params) {
     ${items().length ? items().map((i) => `<div class="line"><span>${i.qty} × ${esc(i.name)}</span><span class="muted">${lineMoney(i, hoursOf(startMs(), endMs()))}</span></div>`).join('') : '<p class="small muted">Elige al menos un servicio.</p>'}
     ${startMs() ? `<div class="line" style="margin-top:6px"><span class="muted">${icon('calendar', 'sm')}</span><span style="text-align:right">${dayLong(startMs())}<br>${time(startMs())}${endMs() ? ` – ${time(endMs())}` : ''}</span></div>` : ''}
     ${W.location ? `<div class="line"><span class="muted">${icon('pin', 'sm')}</span><span style="text-align:right">${esc(W.location.address || `${W.location.lat}, ${W.location.lng}`)}</span></div>` : ''}
-    ${W.location && kmFromBase(W.location) != null ? `<div class="line"><span class="muted">Distancia</span><span>${kmText(W.location)}</span></div>` : ''}
+    ${W.location ? surchargeLine(zone()?.name, zone()?.fee || 0, !!zone()) : ''}
     <div class="line total"><span>Total referencial</span><span>${money(total(), CUR)}</span></div>
     ${hasConsult(items()) ? '<p class="tiny muted">Los extras "a consultar" se suman al confirmar.</p>' : ''}
-    <p class="tiny" style="margin-top:6px;color:var(--pending);font-weight:600">+ Recargo por distancia según la zona (te lo indicamos al confirmar).</p>
+    ${!W.location ? '<p class="tiny" style="margin-top:6px;color:var(--pending);font-weight:600">+ Recargo por distancia según tu zona (se calcula al marcar el lugar).</p>' : !zone() ? '<p class="tiny" style="margin-top:6px;color:var(--pending);font-weight:600">Tu zona no tiene tarifa fija: te indicamos el recargo al confirmar.</p>' : ''}
     <p class="tiny muted" style="margin-top:8px">No pagas nada ahora. Te confirmamos disponibilidad y precio final por la app o WhatsApp.</p></div>`;
 
   const quickDates = () => {
@@ -870,7 +863,7 @@ function vReservar(el, params) {
     return `<div class="card pad form-grid">
         <div class="field"><label>Tu nombre</label><input class="input" id="w-name" value="${esc(W.name)}" autocomplete="name"></div>
         <div class="field"><label>Celular / WhatsApp</label><input class="input" id="w-phone" type="tel" value="${esc(W.phone)}" placeholder="7XXXXXXX" autocomplete="tel"></div>
-        <div class="field full"><label>Detalles del evento (opcional)</label><textarea class="input" id="w-notes" placeholder="Tipo de evento (clase, defensa, culto, taller…), si necesitas pantalla, cable HDMI largo, parlante…">${esc(W.notes)}</textarea></div>
+        <div class="field full"><label>Detalles del evento (opcional)</label><textarea class="input" id="w-notes" placeholder="Tipo de evento (clase, defensa, culto, taller…), si necesitas pantalla o parlante…">${esc(W.notes)}</textarea></div>
         <div class="full banner"><div class="ico">${icon('shield')}</div><div class="small">Al enviar, el negocio recibe tu solicitud al instante y te confirma por esta app. Te avisaremos 1 día antes y 15 minutos antes.</div></div></div>`;
   };
 
@@ -946,7 +939,7 @@ function vReservar(el, params) {
     try {
       const id = await api.createBooking({
         clientName: W.name.trim(), clientPhone: W.phone.trim(), clientEmail: S.user.email || '',
-        items: items().map((i) => (i.perHour ? { ...i, hours: hoursOf(startMs(), endMs()) } : i)), total: total(), extra: 0, start: startMs(), end: endMs(),
+        items: items().map((i) => (i.perHour ? { ...i, hours: hoursOf(startMs(), endMs()) } : i)), total: total(), extra: zone()?.fee || 0, zone: zone()?.name || null, start: startMs(), end: endMs(),
         location: { lat: W.location.lat, lng: W.location.lng, address: W.location.address, reference: W.reference.trim() },
         notes: W.notes.trim(),
       });

@@ -6,7 +6,7 @@ export const DEFAULT_SERVICES = [
   {
     id: 'data-proyector',
     name: 'Alquiler de data (proyector Epson)',
-    description: 'Proyector Epson 3LCD con imagen nítida y brillante para presentaciones, clases, defensas de tesis, cultos, talleres y eventos. 34 Bs por hora; lo llevamos e instalamos en Cochabamba, Sacaba y Vinto (según la distancia se suma un recargo).',
+    description: 'Proyector Epson 3LCD con imagen nítida y brillante para presentaciones, clases, defensas de tesis, cultos, talleres y eventos. 34 Bs por hora; lo llevamos e instalamos en tu lugar (según la zona se suma un recargo por distancia).',
     price: 34, unit: 'por hora', perHour: true, active: true, order: 0,
     photos: ['img/flyer-34bs.jpg', 'img/festival-danza.jpg', 'img/iglesia-ninos.jpg', 'img/defensa-monografia.jpg'],
   },
@@ -21,14 +21,7 @@ export const DEFAULT_SERVICES = [
     id: 'laptop',
     name: 'Laptop',
     description: 'Laptop lista para tu presentación (PowerPoint, PDF, videos). Se alquila junto con el data.',
-    price: 0, unit: '', active: true, order: 2, icon: 'laptop', tone: 'g2',
-    photos: [],
-  },
-  {
-    id: 'cable-hdmi',
-    name: 'Cable HDMI largo',
-    description: 'Cable HDMI largo para conectar tu laptop al data aunque esté lejos del escenario o del púlpito.',
-    price: 0, unit: '', active: true, order: 3, icon: 'cable', tone: 'g6',
+    price: 20, unit: 'por hora', perHour: true, active: true, order: 2, icon: 'laptop', tone: 'g2',
     photos: [],
   },
 ];

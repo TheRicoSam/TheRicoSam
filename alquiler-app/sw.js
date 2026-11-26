@@ -1,10 +1,10 @@
 /* Service worker: app instalable, funciona con mala señal y recibe notificaciones push. */
 importScripts('./firebase-config.js');
 
-const CACHE = 'datacrammer-v2';
+const CACHE = 'datacrammer-v3';
 const SHELL = [
   './', './index.html', './css/app.css', './firebase-config.js', './manifest.webmanifest',
-  './js/app.js', './js/ui.js', './js/map.js', './js/notify.js', './js/backend-demo.js', './js/backend-firebase.js', './js/defaults.js', './js/sort.js',
+  './js/app.js', './js/ui.js', './js/map.js', './js/notify.js', './js/backend-demo.js', './js/backend-firebase.js', './js/defaults.js', './js/sort.js', './js/pricing.js',
   './vendor/leaflet/leaflet.js', './vendor/leaflet/leaflet.css', './icons/icon.svg', './icons/icon-192.png',
 ];
 
