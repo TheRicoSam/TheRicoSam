@@ -2,8 +2,10 @@
 // abiertas en tiempo real (BroadcastChannel). Sirve para probar la app
 // antes de conectar Firebase.
 import { uid, toMs, dayKey } from './ui.js';
+import { DEFAULT_SERVICES, DEFAULT_WORKS } from './defaults.js';
+import { sortWorks } from './sort.js';
 
-const KEY = 'alq_demo_v1';
+const KEY = 'datacrammer_demo_v2';
 const SESSION = 'alq_demo_session';
 export const DEMO_OWNER = { email: 'dueno@demo.bo', password: 'demo1234' };
 export const DEMO_CLIENT = { email: 'cliente@demo.bo', password: 'demo1234' };
@@ -52,7 +54,7 @@ function emitAll() {
   const u = currentUser();
   subs.auth.forEach((cb) => cb(u));
   subs.services.forEach((cb) => cb(sorted(db.services)));
-  subs.works.forEach((cb) => cb([...db.works].sort((a, b) => (b.date || 0) - (a.date || 0))));
+  subs.works.forEach((cb) => cb(sortWorks(db.works)));
   subs.bookings.forEach(({ cb, user }) => cb(bookingsFor(user)));
 }
 const sorted = (arr) => [...arr].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
@@ -98,7 +100,7 @@ export async function saveService(s) {
 }
 export async function deleteService(id) { db.services = db.services.filter((x) => x.id !== id); save(); }
 
-export function watchWorks(cb) { subs.works.add(cb); later(() => cb([...db.works].sort((a, b) => (b.date || 0) - (a.date || 0)))); return () => subs.works.delete(cb); }
+export function watchWorks(cb) { subs.works.add(cb); later(() => cb(sortWorks(db.works))); return () => subs.works.delete(cb); }
 export async function saveWork(w) {
   if (w.id) Object.assign(db.works.find((x) => x.id === w.id), w);
   else db.works.push({ ...w, id: uid(), createdAt: Date.now() });
@@ -143,12 +145,7 @@ export function resetDemo() { localStorage.removeItem(KEY); setSession(null); lo
 function seed() {
   const owner = { uid: 'owner', name: 'Dueño (demo)', phone: '70000000', email: DEMO_OWNER.email, password: DEMO_OWNER.password, createdAt: Date.now() };
   const client = { uid: 'client1', name: 'María Fernández', phone: '71234567', email: DEMO_CLIENT.email, password: DEMO_CLIENT.password, createdAt: Date.now() };
-  const services = [
-    { id: 's1', name: 'Toldo 6 × 12 m', description: 'Toldo blanco impermeable para 80 personas, con instalación y retiro incluidos.', price: 650, unit: 'por evento', photos: [], active: true, order: 0, tone: 'g1' },
-    { id: 's2', name: 'Mesas y sillas (juego de 10)', description: 'Mesa redonda con mantel y 10 sillas tiffany. Precio por juego.', price: 120, unit: 'por juego', photos: [], active: true, order: 1, tone: 'g2' },
-    { id: 's3', name: 'Sonido e iluminación', description: 'Equipo de sonido de 2000 W, luces LED y micrófono inalámbrico.', price: 900, unit: 'por evento', photos: [], active: true, order: 2, tone: 'g3' },
-    { id: 's4', name: 'Decoración completa', description: 'Arco de globos, centros de mesa y fondo temático a elección.', price: 1200, unit: 'por evento', photos: [], active: true, order: 3, tone: 'g4' },
-  ];
+  const services = DEFAULT_SERVICES.map((x) => ({ ...x, photos: [...x.photos] }));
   const plusDays = (n) => dayKey(Date.now() + n * 864e5);
   const at = (d, h) => toMs(d, h);
   const soon = Math.ceil((Date.now() + 3 * 3600e3) / 3600e3) * 3600e3;
@@ -159,17 +156,18 @@ function seed() {
     total: items.reduce((t, i) => t + i.price * i.qty, 0), start, end: start + durH * 3600e3,
     location, notes: '', status, adminNote: '', createdAt: Date.now() - 864e5, updatedAt: Date.now() - 3600e3, ...extra,
   });
+  const [data, promo] = services;
   const bookings = [
-    mk('b1', 'client1', 'María Fernández', '71234567', soon, 6, [item(services[0], 1), item(services[1], 8)],
-      loc(-17.3712, -66.1636, 'Av. América esq. Pando, Cala Cala, Cochabamba', 'Casa de rejas verdes, al lado de la farmacia'), 'confirmado', { notes: 'Cumpleaños de 15 años' }),
-    mk('b2', 'c2', 'Jorge Rocha', '76543210', at(plusDays(1), '15:00'), 8, [item(services[2], 1)],
-      loc(-17.4041, -66.0398, 'Plaza principal de Sacaba', 'Salón de eventos "Los Pinos"'), 'pendiente', { notes: 'Matrimonio, 150 invitados' }),
-    mk('b3', 'c3', 'Lucía Vargas', '70707070', at(plusDays(2), '10:00'), 5, [item(services[3], 1), item(services[1], 5)],
-      loc(-17.3929, -66.2786, 'Calle Héroes del Chaco, Quillacollo', 'Portón negro grande'), 'confirmado'),
-    mk('b4', 'c4', 'Carlos Méndez', '72222222', at(plusDays(1), '18:00'), 5, [item(services[0], 1)],
-      loc(-17.3385, -66.2160, 'Tiquipaya, cerca del Coliseo', ''), 'pendiente'),
-    mk('b5', 'client1', 'María Fernández', '71234567', at(plusDays(-6), '12:00'), 6, [item(services[1], 4)],
+    mk('b1', 'client1', 'María Fernández', '71234567', soon, 3, [item(data, 1)],
+      loc(-17.3712, -66.1636, 'Av. América esq. Pando, Cala Cala, Cochabamba', 'Colegio, entrada por la puerta lateral'), 'confirmado', { notes: 'Defensa de monografía, 4to piso' }),
+    mk('b2', 'c2', 'Jorge Rocha', '76543210', at(plusDays(1), '19:00'), 3, [item(data, 1)],
+      loc(-17.4041, -66.0398, 'Plaza principal de Sacaba', 'Iglesia frente a la plaza'), 'pendiente', { notes: 'Culto de jóvenes, necesito cable HDMI largo' }),
+    mk('b3', 'c3', 'Lucía Vargas', '70707070', at(plusDays(2), '09:00'), 4, [item(data, 1)],
+      loc(-17.3826, -66.2585, 'Av. Blanco Galindo km 13, Vinto', 'Salón de capacitación, portón negro'), 'confirmado', { notes: 'Taller para 40 personas' }),
+    mk('b4', 'c4', 'Carlos Méndez', '72222222', at(plusDays(1), '15:00'), 2, [item(promo, 1)],
+      loc(-17.3936, -66.1450, 'Universidad, zona Las Cuadras, Cochabamba', 'Aula 204'), 'pendiente'),
+    mk('b5', 'client1', 'María Fernández', '71234567', at(plusDays(-6), '10:00'), 2, [item(data, 1)],
       loc(-17.3936, -66.1570, 'Plaza 14 de Septiembre, Cochabamba', ''), 'completado'),
   ];
-  return { users: [owner, client], services, works: [], bookings };
+  return { users: [owner, client], services, works: DEFAULT_WORKS.map((w) => ({ ...w, photos: [...w.photos] })), bookings };
 }

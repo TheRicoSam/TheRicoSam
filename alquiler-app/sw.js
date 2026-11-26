@@ -1,10 +1,10 @@
 /* Service worker: app instalable, funciona con mala señal y recibe notificaciones push. */
 importScripts('./firebase-config.js');
 
-const CACHE = 'alquileres-v1';
+const CACHE = 'datacrammer-v2';
 const SHELL = [
   './', './index.html', './css/app.css', './firebase-config.js', './manifest.webmanifest',
-  './js/app.js', './js/ui.js', './js/map.js', './js/notify.js', './js/backend-demo.js', './js/backend-firebase.js',
+  './js/app.js', './js/ui.js', './js/map.js', './js/notify.js', './js/backend-demo.js', './js/backend-firebase.js', './js/defaults.js', './js/sort.js',
   './vendor/leaflet/leaflet.js', './vendor/leaflet/leaflet.css', './icons/icon.svg', './icons/icon-192.png',
 ];
 
@@ -37,7 +37,7 @@ if (self.FIREBASE_CONFIG && self.FIREBASE_CONFIG.apiKey) {
   firebase.initializeApp(self.FIREBASE_CONFIG);
   firebase.messaging().onBackgroundMessage((payload) => {
     const d = payload.data || {};
-    return self.registration.showNotification(d.title || 'Alquileres', {
+    return self.registration.showNotification(d.title || 'Data Crammer', {
       body: d.body || '', tag: d.tag, renotify: !!d.tag, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
       data: { url: d.url || '#/' }, vibrate: [120, 60, 120],
     });

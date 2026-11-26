@@ -24,7 +24,7 @@ function baseLayers() {
   return { 'Calles': voyager, 'Detallado (calles y negocios)': osm, 'Satélite': sat };
 }
 
-export function pinIcon(color = '#0f766e', label = '') {
+export function pinIcon(color = '#ea580c', label = '') {
   return L.divIcon({
     className: '', iconSize: [36, 46], iconAnchor: [18, 44], popupAnchor: [0, -40],
     html: `<div class="pin"><svg viewBox="0 0 36 46"><path d="M18 1C8.6 1 1 8.4 1 17.6 1 30 18 45 18 45s17-15 17-27.4C35 8.4 27.4 1 18 1z" fill="${color}" stroke="#fff" stroke-width="2"/>${label ? '' : '<circle cx="18" cy="17" r="6" fill="#fff"/>'}</svg>${label ? `<span>${esc(label)}</span>` : ''}</div>`,
@@ -126,7 +126,7 @@ export function locationPicker(wrapEl, { value, onChange }) {
 
   const setPoint = async (latlng, address) => {
     if (!marker) {
-      marker = L.marker(latlng, { draggable: true, icon: pinIcon('#0f766e') }).addTo(map);
+      marker = L.marker(latlng, { draggable: true, icon: pinIcon('#ea580c') }).addTo(map);
       marker.on('dragend', () => setPoint(marker.getLatLng()));
     } else marker.setLatLng(latlng);
     hint.classList.add('hidden');

@@ -4,7 +4,7 @@
  *  - Al cliente: cuando su reserva se confirma, se rechaza o cambia de horario.
  *  - A ambos: 1 día antes y 15 minutos antes de cada reserva confirmada.
  *
- * Cambia ADMIN_EMAILS por tu correo y REGION por la región de tu base Firestore.
+ * REGION debe ser la región de tu base Firestore.
  */
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
@@ -13,7 +13,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 
-const ADMIN_EMAILS = ['tu_correo@gmail.com'];
+const ADMIN_EMAILS = ['samistotelesrico777@gmail.com'];
 const REGION = 'southamerica-east1'; // São Paulo (la más cercana a Bolivia)
 const TZ = 'America/La_Paz';
 

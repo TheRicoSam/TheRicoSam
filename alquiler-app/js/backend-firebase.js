@@ -1,4 +1,5 @@
 // MODO EN LÍNEA: Firebase (Auth + Firestore en tiempo real + Storage + Push).
+import { sortWorks } from './sort.js';
 const V = '10.12.2';
 const base = `https://www.gstatic.com/firebasejs/${V}`;
 
@@ -87,7 +88,7 @@ export const saveService = wrap(async ({ id, ...s }) => {
 export const deleteService = wrap((id) => F.deleteDoc(F.doc(db, 'services', id)));
 
 export function watchWorks(cb) {
-  return F.onSnapshot(F.collection(db, 'works'), (s) => cb(list(s).sort((a, b) => (b.date || 0) - (a.date || 0))), console.error);
+  return F.onSnapshot(F.collection(db, 'works'), (s) => cb(sortWorks(list(s))), console.error);
 }
 export const saveWork = wrap(async ({ id, ...w }) => {
   if (id) await F.setDoc(F.doc(db, 'works', id), w, { merge: true });

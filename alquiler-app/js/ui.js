@@ -38,7 +38,7 @@ const P = {
   tent: '<path d="M3.5 21 14 3M20.5 21 10 3M15.5 21 12 15l-3.5 6M2 21h20"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
   send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
-  google: '',
+  projector: '<rect x="2" y="7" width="20" height="11" rx="2.5"/><circle cx="15.5" cy="12.5" r="3"/><path d="M5.5 10.5h4M5.5 13.5h4M6 18v2M18 18v2"/>',
 };
 
 export const icon = (name, cls = '') =>
@@ -113,7 +113,7 @@ export const statusBadge = (s) => `<span class="badge st-${s}">${STATUS[s]?.labe
 
 export const initials = (name = '') => name.replace(/[^\p{L}\s]/gu, '').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || '?';
 export const avatar = (name, size = 36) =>
-  `<div style="width:${size}px;height:${size}px;border-radius:${size / 3}px;background:linear-gradient(135deg,#14b8a6,#0f766e);color:#fff;display:grid;place-items:center;font-weight:800;font-size:${size * 0.38}px;flex:none">${esc(initials(name))}</div>`;
+  `<div style="width:${size}px;height:${size}px;border-radius:${size / 3}px;background:linear-gradient(135deg,#fb923c,#ea580c);color:#fff;display:grid;place-items:center;font-weight:800;font-size:${size * 0.38}px;flex:none">${esc(initials(name))}</div>`;
 
 // ---------- toasts ----------
 export function toast(title, body = '', kind = '') {

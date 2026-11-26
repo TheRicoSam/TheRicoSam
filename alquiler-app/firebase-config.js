@@ -10,12 +10,13 @@
  *    pega aquí la configuración de tu proyecto Firebase (ver README.md).
  */
 self.APP_SETTINGS = {
-  businessName: 'Alquileres Cochabamba',
-  tagline: 'Alquiler para eventos en Cochabamba',
+  businessName: 'Data Crammer',
+  tagline: 'Alquiler de data (proyectores) · Cochabamba, Sacaba y Vinto',
   // Correo(s) del dueño: quien entre con este correo verá el panel de administración.
-  adminEmails: ['TU_CORREO@gmail.com'],
+  adminEmails: ['samistotelesrico777@gmail.com'],
   // WhatsApp del negocio, con código de país y sin "+" (ej.: 59171234567).
-  whatsapp: '59170000000',
+  whatsapp: '59176499536',
+  whatsappDisplay: '76499536',
   currency: 'Bs',
 };
 

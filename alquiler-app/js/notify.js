@@ -105,7 +105,7 @@ export function downloadICS(b, businessName) {
   const escI = (s) => String(s || '').replace(/[\\,;]/g, (c) => `\\${c}`).replace(/\n/g, '\\n');
   const what = (b.items || []).map((i) => `${i.qty} × ${i.name}`).join(', ');
   const ics = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Alquileres//Reservas//ES', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DataCrammer//Reservas//ES', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
     'BEGIN:VEVENT', `UID:${b.id}@alquileres`, `DTSTAMP:${z(Date.now())}`, `DTSTART:${z(b.start)}`, `DTEND:${z(b.end || b.start + 3600e3)}`,
     `SUMMARY:${escI(`${businessName}: ${what}`)}`, `LOCATION:${escI(b.location?.address)}`,
     `GEO:${b.location?.lat};${b.location?.lng}`,

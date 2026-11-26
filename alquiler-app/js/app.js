@@ -3,6 +3,7 @@ import {
   time, dayLong, dayShort, dayNum, monShort, monthYear, relDay, untilText, dayKey, toMs, hhmmOf, isToday, cap,
   money, STATUS, statusBadge, waLink, telLink, gmapsDir, wazeDir,
 } from './ui.js';
+import { DEFAULT_SERVICES, DEFAULT_WORKS } from './defaults.js';
 import { createMap, locationPicker, pinIcon, CBBA } from './map.js';
 import { registerSW, swRegistration, permission, askPermission, notify, startReminders, diffBookings, downloadICS } from './notify.js';
 
@@ -33,8 +34,20 @@ registerSW();
 startReminders(() => S);
 
 // ---------- datos en tiempo real ----------
-api.watchServices((list) => { S.services = list; refresh(); });
-api.watchWorks((list) => { S.works = list; refresh(); });
+// En línea: mientras Firebase esté vacío se muestra el catálogo inicial, y la
+// primera vez que entra el dueño se guarda (luego se edita desde la app).
+const RAW = { services: null, works: null };
+api.watchServices((list) => { RAW.services = list; S.services = list.length || !ONLINE_MODE ? list : DEFAULT_SERVICES; seedOnline(); refresh(); });
+api.watchWorks((list) => { RAW.works = list; S.works = list.length || !ONLINE_MODE ? list : DEFAULT_WORKS; seedOnline(); refresh(); });
+let seeded = false;
+async function seedOnline() {
+  if (!ONLINE_MODE || seeded || !isAdmin() || !RAW.services || !RAW.works || RAW.services.length || RAW.works.length) return;
+  seeded = true;
+  try {
+    for (const s of DEFAULT_SERVICES) await api.saveService(s);
+    for (const w of DEFAULT_WORKS) await api.saveWork(w);
+  } catch (e) { console.warn('No se pudo cargar el catálogo inicial', e); }
+}
 api.onAuth((user) => {
   const changed = user?.uid !== S.user?.uid || user?.role !== S.user?.role;
   S.user = user; S.ready = true;
@@ -45,6 +58,7 @@ api.onAuth((user) => {
       S.bookings = list; S.bookingsLoaded = true; refresh(); detail?.refresh();
     });
     shellFor = null;
+    seedOnline();
     if (user && location.hash.length < 3) location.hash = isAdmin() ? '#/panel' : '#/inicio';
     if (user && ONLINE_MODE && permission() === 'granted') setupPush();
   }
@@ -60,6 +74,8 @@ const svcById = (id) => S.services.find((s) => s.id === id);
 const itemsText = (b) => (b.items || []).map((i) => `${i.qty > 1 ? `${i.qty} × ` : ''}${i.name}`).join(', ');
 const upcoming = (list) => list.filter((b) => (b.end || b.start) > Date.now() && ['pendiente', 'confirmado'].includes(b.status));
 const conflictsOf = (b) => S.bookings.filter((o) => o.id !== b.id && o.status === 'confirmado' && o.start < (b.end || b.start) && b.start < (o.end || o.start));
+const priceTag = (s) => (s.price > 0 ? `${money(s.price, CUR)} <small>${esc(s.unit || '')}</small>` : '<span style="font-size:15px">Consultar precio</span>');
+const lineMoney = (i) => (i.price > 0 ? money(i.price * i.qty, CUR) : 'A consultar');
 const tones = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'];
 const toneOf = (s, i = 0) => s.tone || tones[i % tones.length];
 
@@ -210,7 +226,7 @@ const emptyBox = (ic, title, text, action = '') =>
 
 const svcMedia = (s, i) => s.photos?.length
   ? `<img src="${esc(s.photos[0])}" alt="${esc(s.name)}" loading="lazy">${s.photos.length > 1 ? `<span class="count-photos">${icon('image', 'sm')} ${s.photos.length}</span>` : ''}`
-  : `<div class="ph ${toneOf(s, i)}">${icon('tent')}</div>`;
+  : `<div class="ph ${toneOf(s, i)}">${icon('projector')}</div>`;
 
 function notifBanner() {
   const p = permission();
@@ -251,7 +267,7 @@ function openBooking(id) {
         <div class="dl"><div class="k">${icon('phone', 'sm')} Teléfono</div><div class="v"><a href="${telLink(b.clientPhone)}">${esc(b.clientPhone || '—')}</a></div></div>` : ''}
         <div class="dl full"><div class="k">${icon('pin', 'sm')} Dirección</div><div class="v">${esc(b.location?.address || '—')}</div>${b.location?.reference ? `<div class="small muted" style="margin-top:4px">Referencia: ${esc(b.location.reference)}</div>` : ''}</div>
         <div class="dl full"><div class="k">${icon('box', 'sm')} Servicios</div>
-          ${(b.items || []).map((i) => `<div class="row" style="justify-content:space-between;margin-top:6px"><span class="strong" style="font-weight:600">${i.qty} × ${esc(i.name)}</span><span class="muted small">${money(i.price * i.qty, CUR)}</span></div>`).join('')}
+          ${(b.items || []).map((i) => `<div class="row" style="justify-content:space-between;margin-top:6px"><span class="strong" style="font-weight:600">${i.qty} × ${esc(i.name)}</span><span class="muted small">${lineMoney(i)}</span></div>`).join('')}
           <div class="row" style="justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line-strong)"><b>Total referencial</b><b class="price">${money(b.total, CUR)}</b></div></div>
         ${b.notes ? `<div class="dl full"><div class="k">${icon('edit', 'sm')} Notas del cliente</div><div class="v" style="font-weight:500">${esc(b.notes)}</div></div>` : ''}
       </div>
@@ -404,7 +420,7 @@ function vPanel(el) {
   let map, timer;
   if (next) {
     map = createMap(el.querySelector('#next-map'), { center: [next.location.lat, next.location.lng], zoom: 15, layersControl: false, locate: false });
-    L.marker([next.location.lat, next.location.lng], { icon: pinIcon('#14b8a6') }).addTo(map);
+    L.marker([next.location.lat, next.location.lng], { icon: pinIcon('#f97316') }).addTo(map);
     const cd = el.querySelector('#cd');
     const paint = () => {
       let s = Math.max(0, Math.floor((next.start - Date.now()) / 1000));
@@ -537,7 +553,7 @@ function vServicios(el) {
     ${S.services.length ? `<div class="svc-grid">${S.services.map((s, i) => `<div class="card svc">
       <div class="svc-media">${svcMedia(s, i)}</div>
       <div class="svc-body"><div class="row" style="justify-content:space-between"><h3>${esc(s.name)}</h3>${s.active === false ? '<span class="badge st-cancelado">Oculto</span>' : ''}</div><p>${esc(s.description)}</p>
-      <div class="svc-foot"><span class="price">${money(s.price, CUR)} <small>${esc(s.unit || '')}</small></span><button class="btn sm ghost" data-edit="${s.id}">${icon('edit', 'sm')} Editar</button></div></div></div>`).join('')}</div>`
+      <div class="svc-foot"><span class="price">${priceTag(s)}</span><button class="btn sm ghost" data-edit="${s.id}">${icon('edit', 'sm')} Editar</button></div></div></div>`).join('')}</div>`
       : emptyBox('box', 'Aún no tienes servicios', 'Agrega lo que alquilas, con precio y fotos.')}</div>`;
   el.querySelector('#new').onclick = () => editService();
   el.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => editService(svcById(b.dataset.edit)));
@@ -569,10 +585,10 @@ function editService(s = null) {
   modal({
     title: s ? 'Editar servicio' : 'Nuevo servicio',
     body: `<div class="form-grid">
-      <div class="field full"><label>Nombre</label><input class="input" id="sv-n" value="${esc(s?.name)}" placeholder="Ej.: Toldo 6 × 12 m"></div>
+      <div class="field full"><label>Nombre</label><input class="input" id="sv-n" value="${esc(s?.name)}" placeholder="Ej.: Data + pantalla"></div>
       <div class="field full"><label>Descripción</label><textarea class="input" id="sv-d" placeholder="Qué incluye, capacidad, medidas…">${esc(s?.description)}</textarea></div>
       <div class="field"><label>Precio (${CUR})</label><input class="input" id="sv-p" type="number" min="0" step="1" value="${s?.price ?? ''}"></div>
-      <div class="field"><label>Unidad</label><input class="input" id="sv-u" value="${esc(s?.unit || 'por evento')}" placeholder="por evento, por día, por hora…"></div>
+      <div class="field"><label>Unidad</label><input class="input" id="sv-u" value="${esc(s?.unit || 'por alquiler')}" placeholder="por alquiler, por hora, por día…"></div>
       <div class="field full"><label>Fotos</label><div id="sv-ph"></div><span class="hint">La primera foto es la portada.</span></div>
       <label class="row full small strong"><input type="checkbox" id="sv-a" ${s?.active === false ? '' : 'checked'}> Visible para los clientes</label></div>`,
     foot: `${s ? `<button class="btn danger-soft" id="sv-del" style="margin-right:auto">${icon('trash', 'sm')} Eliminar</button>` : ''}<button class="btn ghost" data-close>Cancelar</button><button class="btn" id="sv-ok">Guardar</button>`,
@@ -598,7 +614,7 @@ function editService(s = null) {
 function vGaleria(el) {
   const admin = isAdmin();
   el.innerHTML = `<div class="fade-in">
-    <div class="section-head"><div style="flex:1"><h2>Trabajos realizados</h2><p>${admin ? 'Sube fotos de tus eventos para que los clientes vean la calidad de tu servicio.' : 'Fotos reales de eventos que hemos atendido.'}</p></div>
+    <div class="section-head"><div style="flex:1"><h2>Trabajos realizados</h2><p>${admin ? 'Sube fotos de tus trabajos para que los clientes vean la calidad de la proyección.' : 'Fotos reales de clases, defensas, cultos y eventos donde llevamos nuestro data.'}</p></div>
       ${admin ? `<button class="btn" id="new">${icon('plus', 'sm')} Nuevo trabajo</button>` : `<a class="btn" href="#/reservar">${icon('calPlus', 'sm')} Reservar</a>`}</div>
     ${S.works.length ? `<div class="gallery">${S.works.map((w) => `<div class="card work" data-w="${w.id}">
       ${w.photos?.[0] ? `<img src="${esc(w.photos[0])}" alt="${esc(w.title)}" loading="lazy">` : `<div class="ph g1" style="aspect-ratio:4/3;display:grid;place-items:center;color:#fff">${icon('image', 'lg')}</div>`}
@@ -621,7 +637,7 @@ function editWork(w = null) {
   modal({
     title: w ? 'Editar trabajo' : 'Nuevo trabajo realizado',
     body: `<div class="form-grid">
-      <div class="field full"><label>Título</label><input class="input" id="w-t" value="${esc(w?.title)}" placeholder="Ej.: Boda en Tiquipaya"></div>
+      <div class="field full"><label>Título</label><input class="input" id="w-t" value="${esc(w?.title)}" placeholder="Ej.: Defensa de tesis en la UMSS"></div>
       <div class="field"><label>Servicio</label><select class="input" id="w-s"><option value="">—</option>${S.services.map((s) => `<option value="${s.id}" ${w?.serviceId === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
       <div class="field"><label>Fecha</label><input class="input" type="date" id="w-d" value="${w?.date ? dayKey(w.date) : ''}"></div>
       <div class="field full"><label>Lugar / zona</label><input class="input" id="w-p" value="${esc(w?.place)}" placeholder="Ej.: Quillacollo"></div>
@@ -636,7 +652,7 @@ function editWork(w = null) {
         if (!photos.length) return toast('Agrega al menos una foto', '', 'bad');
         const d = el.querySelector('#w-d').value;
         try {
-          await api.saveWork({ ...(w ? { id: w.id } : {}), title, serviceId: el.querySelector('#w-s').value, date: d ? toMs(d, '12:00') : Date.now(), place: el.querySelector('#w-p').value.trim(), description: el.querySelector('#w-de').value.trim(), photos });
+          await api.saveWork({ ...(w ? { id: w.id } : {}), title, serviceId: el.querySelector('#w-s').value, date: d ? toMs(d, '12:00') : (w?.date || 0), place: el.querySelector('#w-p').value.trim(), description: el.querySelector('#w-de').value.trim(), photos });
           m.close(); toast('Trabajo publicado', 'Tus clientes ya pueden verlo.', 'ok');
         } catch (err) { toast('No se pudo guardar', err.message, 'bad'); }
       };
@@ -684,7 +700,7 @@ function vPerfil(el) {
     try { await api.updateProfile({ name: el.querySelector('#p-n').value.trim(), phone: el.querySelector('#p-p').value.trim() }); toast('Perfil actualizado', '', 'ok'); }
     catch (e) { toast('No se pudo guardar', e.message, 'bad'); }
   };
-  el.querySelector('#p-test')?.addEventListener('click', () => notify('Así se verán tus avisos', 'Ejemplo: "Empieza en 15 min · Toldo 6×12 en Cala Cala"', { tag: 'test' }));
+  el.querySelector('#p-test')?.addEventListener('click', () => notify('Así se verán tus avisos', 'Ejemplo: "Empieza en 15 min · Data en Cala Cala"', { tag: 'test' }));
   el.querySelector('#p-out').onclick = () => api.signOut();
   el.querySelector('#p-reset')?.addEventListener('click', async () => { if (await confirmDialog({ title: '¿Reiniciar la demo?', text: 'Se borrarán los datos de prueba de este navegador.', ok: 'Reiniciar', danger: true })) api.resetDemo(); });
 }
@@ -698,26 +714,26 @@ function vInicio(el) {
   el.innerHTML = `<div class="fade-in">
     ${notifBanner()}
     <section class="hero">
-      <div class="eyebrow">${icon('pin', 'sm')} Cochabamba, Bolivia</div>
-      <h1 style="font-size:clamp(26px,4vw,40px);max-width:640px">Reserva en minutos. Nosotros llegamos al lugar.</h1>
-      <p class="lead">Elige el servicio, la fecha y marca en el mapa dónde será tu evento. Te confirmamos por aquí al instante.</p>
+      <div class="eyebrow">${icon('pin', 'sm')} Cochabamba · Sacaba · Vinto</div>
+      <h1 style="font-size:clamp(28px,4.4vw,46px);max-width:680px">Que tu presentación <span style="color:var(--hl)">se vea en grande.</span></h1>
+      <p class="lead">Alquila un data (proyector Epson) a <b style="color:#fff">34 Bs</b>. Elige la fecha, marca en el mapa dónde será tu clase, defensa o evento, y te lo llevamos. Te confirmamos por aquí al instante.</p>
       <div class="row wrap" style="margin-top:22px">
-        <a class="btn lg" href="#/reservar">${icon('calPlus')} Hacer una reserva</a>
+        <a class="btn lg" href="#/reservar">${icon('calPlus')} Reservar un data</a>
         <a class="btn lg ghost" href="#/galeria">${icon('images')} Ver trabajos</a>
       </div>
     </section>
     ${mine.length ? `<div class="section"><div class="section-head"><h2 style="flex:1">Tus próximas reservas</h2><a href="#/mis-reservas" class="small strong">Ver todas</a></div>
       <div class="card"><div class="blist">${mine.slice(0, 3).map(bookingRow).join('')}</div></div></div>` : ''}
-    <div class="section"><div class="section-head"><div style="flex:1"><h2>Nuestros servicios</h2><p>Precios referenciales; el total final se confirma con la reserva.</p></div></div>
+    <div class="section"><div class="section-head"><div style="flex:1"><h2>Nuestros servicios</h2><p>Te llevamos el proyector a Cochabamba, Sacaba y Vinto.</p></div></div>
       ${services.length ? `<div class="svc-grid">${services.map((s, i) => `<div class="card svc" data-s="${s.id}" style="cursor:pointer">
         <div class="svc-media">${svcMedia(s, i)}</div>
         <div class="svc-body"><h3>${esc(s.name)}</h3><p>${esc(s.description)}</p>
-        <div class="svc-foot"><span class="price">${money(s.price, CUR)} <small>${esc(s.unit || '')}</small></span><a class="btn sm" href="#/reservar?s=${s.id}">Reservar</a></div></div></div>`).join('')}</div>`
+        <div class="svc-foot"><span class="price">${priceTag(s)}</span><a class="btn sm" href="#/reservar?s=${s.id}">Reservar</a></div></div></div>`).join('')}</div>`
       : emptyBox('box', 'Catálogo en preparación', 'Muy pronto verás aquí nuestros servicios.')}</div>
     ${S.works.length ? `<div class="section"><div class="section-head"><h2 style="flex:1">Trabajos recientes</h2><a href="#/galeria" class="small strong">Ver galería</a></div>
       <div class="svc-grid">${S.works.slice(0, 3).map((w) => `<div class="card svc" data-w="${w.id}" style="cursor:pointer"><div class="svc-media">${w.photos?.[0] ? `<img src="${esc(w.photos[0])}" alt="" loading="lazy">` : ''}</div><div class="svc-body"><h3>${esc(w.title)}</h3><span class="small muted">${esc(w.place || '')}</span></div></div>`).join('')}</div></div>` : ''}
     <div class="section card pad row wrap" style="justify-content:space-between">
-      <div><h3>¿Tienes dudas?</h3><p class="muted small">Escríbenos y te ayudamos a elegir.</p></div>
+      <div><h3>¿Tienes dudas o quieres la promoción?</h3><p class="muted small">Escríbenos al ${esc(CFG.whatsappDisplay || CFG.whatsapp)} y te ayudamos.</p></div>
       <a class="btn btn-wa" href="${waLink(CFG.whatsapp, `Hola ${BIZ}, quiero consultar sobre un alquiler.`)}" target="_blank" rel="noopener">${icon('chat', 'sm')} WhatsApp</a>
     </div></div>`;
   bindOpen(el); bindNotif(el);
@@ -729,8 +745,8 @@ function showService(s) {
   if (!s) return;
   modal({
     title: esc(s.name), wide: true,
-    body: `${s.photos?.length ? `<div class="photos-edit" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${s.photos.map((p, i) => `<div class="ph-item" data-i="${i}" style="cursor:zoom-in"><img src="${esc(p)}" alt=""></div>`).join('')}</div>` : `<div class="svc-media ${toneOf(s)}" style="border-radius:16px"><div class="ph">${icon('tent')}</div></div>`}
-      <p style="margin-top:16px">${esc(s.description)}</p><p class="price" style="margin-top:12px">${money(s.price, CUR)} <small>${esc(s.unit || '')}</small></p>`,
+    body: `${s.photos?.length ? `<div class="photos-edit" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${s.photos.map((p, i) => `<div class="ph-item" data-i="${i}" style="cursor:zoom-in"><img src="${esc(p)}" alt=""></div>`).join('')}</div>` : `<div class="svc-media ${toneOf(s)}" style="border-radius:16px"><div class="ph">${icon('projector')}</div></div>`}
+      <p style="margin-top:16px">${esc(s.description)}</p><p class="price" style="margin-top:12px">${priceTag(s)}</p>`,
     foot: `<button class="btn ghost" data-close>Cerrar</button><a class="btn" href="#/reservar?s=${s.id}" data-close>${icon('calPlus', 'sm')} Reservar este servicio</a>`,
     onMount: (el) => el.querySelectorAll('[data-i]').forEach((x) => x.onclick = () => lightbox(s.photos, +x.dataset.i, s.name)),
   });
@@ -764,11 +780,11 @@ function vReservar(el, params) {
   const endMs = () => { if (!W.date || !W.end) return null; let e = toMs(W.date, W.end); if (e <= startMs()) e += 864e5; return e; };
 
   const summary = () => `<div class="card pad summary"><h3 style="margin-bottom:10px">Resumen</h3>
-    ${items().length ? items().map((i) => `<div class="line"><span>${i.qty} × ${esc(i.name)}</span><span class="muted">${money(i.price * i.qty, CUR)}</span></div>`).join('') : '<p class="small muted">Elige al menos un servicio.</p>'}
+    ${items().length ? items().map((i) => `<div class="line"><span>${i.qty} × ${esc(i.name)}</span><span class="muted">${lineMoney(i)}</span></div>`).join('') : '<p class="small muted">Elige al menos un servicio.</p>'}
     ${startMs() ? `<div class="line" style="margin-top:6px"><span class="muted">${icon('calendar', 'sm')}</span><span style="text-align:right">${dayLong(startMs())}<br>${time(startMs())}${endMs() ? ` – ${time(endMs())}` : ''}</span></div>` : ''}
     ${W.location ? `<div class="line"><span class="muted">${icon('pin', 'sm')}</span><span style="text-align:right">${esc(W.location.address || `${W.location.lat}, ${W.location.lng}`)}</span></div>` : ''}
     <div class="line total"><span>Total referencial</span><span>${money(total(), CUR)}</span></div>
-    <p class="tiny muted" style="margin-top:8px">No pagas nada ahora. Te confirmamos disponibilidad y precio final.</p></div>`;
+    <p class="tiny muted" style="margin-top:8px">No pagas nada ahora. Te confirmamos disponibilidad y precio final por la app o WhatsApp.</p></div>`;
 
   const quickDates = () => {
     const out = [['Hoy', 0], ['Mañana', 1]];
@@ -779,24 +795,24 @@ function vReservar(el, params) {
 
   const stepBody = () => {
     if (W.step === 1) return `<div class="col">${S.services.filter((s) => s.active !== false).map((s, i) => `<div class="pick ${W.qty[s.id] ? 'on' : ''}">
-        <div class="thumb">${s.photos?.[0] ? `<img src="${esc(s.photos[0])}" alt="">` : `<div class="ph ${toneOf(s, i)}" style="position:absolute;inset:0;display:grid;place-items:center;color:#fff">${icon('tent')}</div>`}</div>
-        <div style="min-width:0"><b class="strong">${esc(s.name)}</b><div class="small muted" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(s.description)}</div><div class="price" style="font-size:15px;margin-top:2px">${money(s.price, CUR)} <small>${esc(s.unit || '')}</small></div></div>
+        <div class="thumb">${s.photos?.[0] ? `<img src="${esc(s.photos[0])}" alt="">` : `<div class="ph ${toneOf(s, i)}" style="position:absolute;inset:0;display:grid;place-items:center;color:#fff">${icon('projector')}</div>`}</div>
+        <div style="min-width:0"><b class="strong">${esc(s.name)}</b><div class="small muted" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(s.description)}</div><div class="price" style="font-size:15px;margin-top:2px">${priceTag(s)}</div></div>
         <div class="stepper"><button type="button" data-dec="${s.id}" aria-label="Menos">−</button><input inputmode="numeric" data-qty="${s.id}" value="${W.qty[s.id] || 0}"><button type="button" data-inc="${s.id}" aria-label="Más">+</button></div></div>`).join('') || emptyBox('box', 'No hay servicios disponibles', 'Vuelve más tarde.')}</div>`;
     if (W.step === 2) return `<div class="card pad col">
         <div class="field"><label>¿Qué día?</label><div class="chips" style="margin-bottom:8px">${quickDates().map(([t, d]) => `<button type="button" class="chip ${W.date === d ? 'on' : ''}" data-qd="${d}">${t}</button>`).join('')}</div>
           <input class="input" type="date" id="w-date" min="${dayKey(Date.now())}" value="${W.date}"></div>
         <div class="form-grid"><div class="field"><label>Desde (hora)</label><input class="input" type="time" id="w-start" value="${W.start}" step="900"></div>
           <div class="field"><label>Hasta (hora)</label><input class="input" type="time" id="w-end" value="${W.end}" step="900"></div></div>
-        <div class="field"><label>Duración rápida</label><div class="chips">${[4, 6, 8, 12].map((h) => `<button type="button" class="chip" data-dur="${h}">${h} horas</button>`).join('')}</div></div>
+        <div class="field"><label>Duración rápida</label><div class="chips">${[1, 2, 3, 4, 8].map((h) => `<button type="button" class="chip" data-dur="${h}">${h} hora${h > 1 ? 's' : ''}</button>`).join('')}</div></div>
         <p class="small muted">Horario de Bolivia. Si termina pasada la medianoche, se toma como el día siguiente.</p></div>`;
     if (W.step === 3) return `<div class="col"><div id="picker"></div>
         <div class="card pad form-grid">
           <div class="field full"><label>Dirección</label><input class="input" id="w-addr" value="${esc(W.location?.address || '')}" placeholder="Se completa al marcar el mapa; puedes corregirla"></div>
-          <div class="field full"><label>Referencia para llegar</label><input class="input" id="w-ref" value="${esc(W.reference)}" placeholder="Ej.: portón negro, frente a la cancha, 2do piso"></div></div></div>`;
+          <div class="field full"><label>Referencia para llegar</label><input class="input" id="w-ref" value="${esc(W.reference)}" placeholder="Ej.: Aula 204, 2do piso · iglesia frente a la plaza"></div></div></div>`;
     return `<div class="card pad form-grid">
         <div class="field"><label>Tu nombre</label><input class="input" id="w-name" value="${esc(W.name)}" autocomplete="name"></div>
         <div class="field"><label>Celular / WhatsApp</label><input class="input" id="w-phone" type="tel" value="${esc(W.phone)}" placeholder="7XXXXXXX" autocomplete="tel"></div>
-        <div class="field full"><label>Detalles del evento (opcional)</label><textarea class="input" id="w-notes" placeholder="Tipo de evento, número de invitados, colores, si hay escaleras…">${esc(W.notes)}</textarea></div>
+        <div class="field full"><label>Detalles del evento (opcional)</label><textarea class="input" id="w-notes" placeholder="Tipo de evento (clase, defensa, culto, taller…), si necesitas pantalla, cable HDMI largo, parlante…">${esc(W.notes)}</textarea></div>
         <div class="full banner"><div class="ico">${icon('shield')}</div><div class="small">Al enviar, el negocio recibe tu solicitud al instante y te confirma por esta app. Te avisaremos 1 día antes y 15 minutos antes.</div></div></div>`;
   };
 
@@ -804,7 +820,7 @@ function vReservar(el, params) {
     pickMap?.remove(); pickMap = null;
     el.innerHTML = `<div class="fade-in">
       <div class="steps">${STEPS.map((t, i) => `<div class="step ${W.step === i + 1 ? 'on' : W.step > i + 1 ? 'done' : ''}"><span class="n">${W.step > i + 1 ? icon('check', 'sm') : i + 1}</span><span class="t">${t}</span></div>`).join('')}</div>
-      <div class="wiz-layout"><div><h2 style="margin-bottom:14px">${['¿Qué necesitas?', '¿Cuándo?', '¿Dónde será?', 'Tus datos'][W.step - 1]}</h2><div id="wbody">${stepBody()}</div>
+      <div class="wiz-layout"><div><h2 style="margin-bottom:14px">${['¿Qué quieres alquilar?', '¿Cuándo lo necesitas?', '¿Dónde será?', 'Tus datos'][W.step - 1]}</h2><div id="wbody">${stepBody()}</div>
         <div class="wiz-actions">${W.step > 1 ? `<button class="btn ghost" id="back">${icon('left', 'sm')} Atrás</button>` : '<span></span>'}
           <button class="btn lg" id="next" ${W.sending ? 'disabled' : ''}>${W.step < 4 ? `Continuar ${icon('arrow', 'sm')}` : `${icon('send', 'sm')} ${W.sending ? 'Enviando…' : 'Enviar solicitud'}`}</button></div></div>
         <div id="sum">${summary()}</div></div></div>`;
@@ -899,9 +915,9 @@ function renderAuth(tab = 'in') {
   root.innerHTML = `<div class="auth">
     <section class="auth-art">
       <div class="brand" style="padding:0"><div class="brand-mark"></div><div><div class="brand-name">${esc(BIZ)}</div><div class="brand-sub">${esc(CFG.tagline || '')}</div></div></div>
-      <div><h1>Tu evento, <em>reservado y ubicado</em> en tiempo real.</h1>
+      <div><h1>Que tu presentación <em>se vea en grande.</em></h1><p style="margin-top:14px;font-size:17px;color:#a5b4c8;max-width:480px">Alquiler de data (proyectores) en Cochabamba, Sacaba y Vinto. Reserva en línea y recibe la confirmación al instante.</p>
         <div class="feats">
-          <div class="feat"><div class="ico">${icon('calPlus')}</div><div><b>Reserva en 4 pasos</b><span>Servicios, fecha, lugar y listo.</span></div></div>
+          <div class="feat"><div class="ico">${icon('projector')}</div><div><b>Reserva en 4 pasos</b><span>Proyector, fecha, lugar y listo.</span></div></div>
           <div class="feat"><div class="ico">${icon('map')}</div><div><b>Mapa detallado de Cochabamba</b><span>Marca la ubicación exacta: calles, zonas y satélite.</span></div></div>
           <div class="feat"><div class="ico">${icon('bell')}</div><div><b>Confirmación y recordatorios</b><span>Avisos al confirmar, 1 día antes y 15 minutos antes.</span></div></div>
         </div></div>

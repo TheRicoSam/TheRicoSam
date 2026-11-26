@@ -1,4 +1,4 @@
-# Alquileres Cochabamba · App de reservas
+# Data Crammer · App de alquiler de data (proyectores)
 
 Una sola app web para el dueño y sus clientes. Se puede instalar en el celular como app (PWA) y funciona en tiempo real por internet.
 
@@ -37,12 +37,8 @@ Usa los botones "Soy el dueño" / "Soy cliente". Para ver el tiempo real, abre d
 2. **Authentication** › Método de acceso: activa **Correo/contraseña** y **Google**.
 3. **Firestore Database** › Crear base de datos (región `southamerica-east1`, São Paulo).
 4. **Storage** › Comenzar (para las fotos).
-5. Pon tu correo en:
-   - `firebase-config.js` › `adminEmails`
-   - `firestore.rules` y `storage.rules` (en minúsculas)
-   - `functions/index.js` › `ADMIN_EMAILS`
-6. Cambia el nombre del negocio, la frase y el WhatsApp en `firebase-config.js` › `APP_SETTINGS`.
-7. Publica (necesitas Node.js):
+5. Tu correo de dueño, el nombre Data Crammer y el WhatsApp 76499536 ya están configurados (`firebase-config.js`, `firestore.rules`, `storage.rules`, `functions/index.js`). Si cambias de correo, cámbialo en esos 4 archivos.
+6. Publica (necesitas Node.js):
    ```bash
    npm install -g firebase-tools
    firebase login
@@ -51,7 +47,7 @@ Usa los botones "Soy el dueño" / "Soy cliente". Para ver el tiempo real, abre d
    firebase deploy --only hosting,firestore,storage
    ```
    Te dará una dirección como `https://tu-proyecto.web.app`. Esa es la app que compartes con tus clientes.
-8. Entra con **Google** usando tu correo: verás el panel del dueño. Para el panel, el correo tiene que estar verificado, y con Google ya lo está.
+7. Entra con **Google** usando tu correo: verás el panel del dueño. Para el panel, el correo tiene que estar verificado, y con Google ya lo está. La primera vez que entres se guardan solos tus servicios (data a 34 Bs y la Promoción 2) y las fotos de trabajos; luego los editas desde la app.
 
 ### Notificaciones con la app cerrada (opcional, recomendado)
 

@@ -1,12 +1,11 @@
 rules_version = '2';
 // Reglas de seguridad: cada cliente ve solo sus reservas; el dueño ve y gestiona todo.
-// IMPORTANTE: cambia TU_CORREO@gmail.com por tu correo (el mismo de firebase-config.js).
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function isAdmin() {
       return signedIn() && request.auth.token.email_verified == true
-        && request.auth.token.email.lower() in ['tu_correo@gmail.com'];
+        && request.auth.token.email.lower() in ['samistotelesrico777@gmail.com'];
     }
 
     match /services/{id} { allow read: if true; allow write: if isAdmin(); }
