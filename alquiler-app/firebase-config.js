@@ -18,6 +18,8 @@ self.APP_SETTINGS = {
   whatsapp: '59176499536',
   whatsappDisplay: '76499536',
   currency: 'Bs',
+  // Punto desde donde sales (para calcular la distancia y el recargo). Cámbialo por tu dirección.
+  base: { lat: -17.3935, lng: -66.157, name: 'la Plaza 14 de Septiembre' },
 };
 
 self.FIREBASE_CONFIG = {

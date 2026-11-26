@@ -50,6 +50,7 @@ async function seedOnline() {
 }
 api.onAuth((user) => {
   const changed = user?.uid !== S.user?.uid || user?.role !== S.user?.role;
+  const first = !S.ready;
   S.user = user; S.ready = true;
   if (changed) {
     unsubBookings?.(); S.bookings = []; S.bookingsLoaded = false;
@@ -62,7 +63,8 @@ api.onAuth((user) => {
     if (user && location.hash.length < 3) location.hash = isAdmin() ? '#/panel' : '#/inicio';
     if (user && ONLINE_MODE && permission() === 'granted') setupPush();
   }
-  route();
+  if (changed || first) route();
+  else if (user) { S.user = user; paintBadges(); }
 });
 addEventListener('online', () => { S.online = true; paintConn(); });
 addEventListener('offline', () => { S.online = false; paintConn(); });
@@ -75,7 +77,28 @@ const itemsText = (b) => (b.items || []).map((i) => `${i.qty > 1 ? `${i.qty} × 
 const upcoming = (list) => list.filter((b) => (b.end || b.start) > Date.now() && ['pendiente', 'confirmado'].includes(b.status));
 const conflictsOf = (b) => S.bookings.filter((o) => o.id !== b.id && o.status === 'confirmado' && o.start < (b.end || b.start) && b.start < (o.end || o.start));
 const priceTag = (s) => (s.price > 0 ? `${money(s.price, CUR)} <small>${esc(s.unit || '')}</small>` : '<span style="font-size:15px">Consultar precio</span>');
-const lineMoney = (i) => (i.price > 0 ? money(i.price * i.qty, CUR) : 'A consultar');
+// Precios: los servicios "por hora" se multiplican por las horas reservadas (se cobra la hora empezada).
+const hoursOf = (start, end) => (start && end && end > start ? Math.ceil((end - start) / 3600e3 - 1e-9) : null);
+const fmtH = (h) => `${h} h`;
+const lineAmount = (i, hours) => (i.price || 0) * i.qty * (i.perHour ? (hours ?? i.hours ?? 1) : 1);
+const lineMoney = (i, hours) => {
+  if (!(i.price > 0)) return 'A consultar';
+  const h = hours ?? i.hours;
+  if (i.perHour && !h) return `${money(i.price * i.qty, CUR)} / hora`;
+  return `${money(lineAmount(i, h), CUR)}${i.perHour ? ` · ${fmtH(h)}` : ''}`;
+};
+const calcTotal = (items, start, end, extra = 0) => (items || []).reduce((t, i) => t + lineAmount(i, hoursOf(start, end)), 0) + (+extra || 0);
+const hasConsult = (items) => (items || []).some((i) => !(i.price > 0));
+// Distancia en línea recta desde tu base (configurable en firebase-config.js › base).
+const BASE = CFG.base || { lat: -17.3935, lng: -66.157, name: 'la Plaza 14 de Septiembre' };
+function kmFromBase(loc) {
+  if (!loc?.lat) return null;
+  const R = 6371, r = (x) => (x * Math.PI) / 180;
+  const dLat = r(loc.lat - BASE.lat), dLng = r(loc.lng - BASE.lng);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(r(BASE.lat)) * Math.cos(r(loc.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+const kmText = (loc) => { const k = kmFromBase(loc); return k == null ? '' : `≈ ${k < 10 ? k.toFixed(1) : Math.round(k)} km`; };
 const tones = ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'];
 const toneOf = (s, i = 0) => s.tone || tones[i % tones.length];
 
@@ -226,7 +249,7 @@ const emptyBox = (ic, title, text, action = '') =>
 
 const svcMedia = (s, i) => s.photos?.length
   ? `<img src="${esc(s.photos[0])}" alt="${esc(s.name)}" loading="lazy">${s.photos.length > 1 ? `<span class="count-photos">${icon('image', 'sm')} ${s.photos.length}</span>` : ''}`
-  : `<div class="ph ${toneOf(s, i)}">${icon('projector')}</div>`;
+  : `<div class="ph ${toneOf(s, i)}">${icon(s.icon || 'projector')}</div>`;
 
 function notifBanner() {
   const p = permission();
@@ -265,10 +288,12 @@ function openBooking(id) {
         <div class="dl"><div class="k">${icon('clock', 'sm')} Horario</div><div class="v">${time(b.start)} – ${time(b.end)}</div></div>
         ${admin ? `<div class="dl"><div class="k">${icon('user', 'sm')} Cliente</div><div class="v">${esc(b.clientName)}</div></div>
         <div class="dl"><div class="k">${icon('phone', 'sm')} Teléfono</div><div class="v"><a href="${telLink(b.clientPhone)}">${esc(b.clientPhone || '—')}</a></div></div>` : ''}
-        <div class="dl full"><div class="k">${icon('pin', 'sm')} Dirección</div><div class="v">${esc(b.location?.address || '—')}</div>${b.location?.reference ? `<div class="small muted" style="margin-top:4px">Referencia: ${esc(b.location.reference)}</div>` : ''}</div>
+        <div class="dl full"><div class="k">${icon('pin', 'sm')} Dirección</div><div class="v">${esc(b.location?.address || '—')}</div>${b.location?.reference ? `<div class="small muted" style="margin-top:4px">Referencia: ${esc(b.location.reference)}</div>` : ''}${admin && kmFromBase(b.location) != null ? `<div class="small" style="margin-top:4px;color:var(--brand);font-weight:700">${kmText(b.location)} en línea recta desde ${esc(BASE.name)}</div>` : ''}</div>
         <div class="dl full"><div class="k">${icon('box', 'sm')} Servicios</div>
-          ${(b.items || []).map((i) => `<div class="row" style="justify-content:space-between;margin-top:6px"><span class="strong" style="font-weight:600">${i.qty} × ${esc(i.name)}</span><span class="muted small">${lineMoney(i)}</span></div>`).join('')}
-          <div class="row" style="justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line-strong)"><b>Total referencial</b><b class="price">${money(b.total, CUR)}</b></div></div>
+          ${(b.items || []).map((i) => `<div class="row" style="justify-content:space-between;margin-top:6px"><span class="strong" style="font-weight:600">${i.qty} × ${esc(i.name)}</span><span class="muted small">${lineMoney(i, hoursOf(b.start, b.end))}</span></div>`).join('')}
+          ${b.extra > 0 ? `<div class="row" style="justify-content:space-between;margin-top:6px"><span class="strong" style="font-weight:600">Recargo por distancia</span><span class="muted small">${money(b.extra, CUR)}</span></div>` : ''}
+          <div class="row" style="justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line-strong)"><b>${b.status === 'pendiente' ? 'Total referencial' : 'Total'}</b><b class="price">${money(b.total, CUR)}${hasConsult(b.items) ? ' <small>+ extras a consultar</small>' : ''}</b></div>
+          ${b.status === 'pendiente' && !admin ? '<div class="tiny muted" style="margin-top:6px">Si el lugar está lejos se suma un recargo por distancia; te lo indicamos al confirmar.</div>' : ''}</div>
         ${b.notes ? `<div class="dl full"><div class="k">${icon('edit', 'sm')} Notas del cliente</div><div class="v" style="font-weight:500">${esc(b.notes)}</div></div>` : ''}
       </div>
       ${lat ? `<div class="map" id="d-map" style="height:240px;margin-top:14px"></div>
@@ -303,10 +328,7 @@ function openBooking(id) {
       if (!a) return;
       try {
         if (a === 'confirm') {
-          const note = await confirmDialog({ title: 'Confirmar reserva', text: `${b.clientName} · ${dayLong(b.start)} ${time(b.start)}`, ok: 'Confirmar', input: { label: 'Mensaje para el cliente (opcional)', placeholder: 'Ej.: Llegamos 1 hora antes para instalar.' } });
-          if (note === null) return;
-          await api.updateBooking(b.id, { status: 'confirmado', adminNote: note });
-          toast('Reserva confirmada', 'El cliente ya fue notificado.', 'ok');
+          confirmBooking(b);
         } else if (a === 'reject') {
           const note = await confirmDialog({ title: '¿No puedes atender esta reserva?', ok: 'Avisar al cliente', danger: true, input: { label: 'Motivo / alternativa (opcional)', placeholder: 'Ej.: Ese día está ocupado, ¿te sirve el domingo?' } });
           if (note === null) return;
@@ -331,6 +353,39 @@ function openBooking(id) {
   detail = { id, api: m, refresh: () => { const y = el.scrollTop; draw(el); el.scrollTop = y; } };
 }
 
+function confirmBooking(b) {
+  const conf = conflictsOf(b);
+  const hours = hoursOf(b.start, b.end);
+  modal({
+    title: 'Confirmar reserva',
+    body: `<div class="col">
+      ${conf.length ? `<div class="banner warn"><div class="ico">${icon('alert')}</div><div class="small"><b>Se cruza con ${conf.map((c) => `${esc(c.clientName)} (${time(c.start)}–${time(c.end)})`).join(', ')}</b><br>Puedes confirmar igual si tienes otro equipo.</div></div>` : ''}
+      <div class="detail-grid">
+        <div class="dl"><div class="k">${icon('user', 'sm')} Cliente</div><div class="v">${esc(b.clientName)}</div><div class="tiny muted">${dayLong(b.start)} · ${time(b.start)}–${time(b.end)} (${fmtH(hours)})</div></div>
+        <div class="dl"><div class="k">${icon('pin', 'sm')} Distancia</div><div class="v">${kmText(b.location) || '—'}</div><div class="tiny muted">en línea recta desde ${esc(BASE.name)}</div></div>
+      </div>
+      <div class="dl">${(b.items || []).map((i) => `<div class="row" style="justify-content:space-between"><span>${i.qty} × ${esc(i.name)}</span><span class="muted small">${lineMoney(i, hours)}</span></div>`).join('')}</div>
+      <div class="form-grid">
+        <div class="field"><label>Recargo por distancia (${CUR})</label><input class="input" id="cb-x" type="number" min="0" step="1" value="${b.extra || 0}"><span class="hint">0 si está cerca.</span></div>
+        <div class="field"><label>Total a cobrar</label><div class="input" id="cb-t" style="display:flex;align-items:center;font-weight:800;background:var(--surface-2)"></div>${hasConsult(b.items) ? '<span class="hint">Hay extras "a consultar": súmalos en el recargo o escríbelos en el mensaje.</span>' : ''}</div>
+        <div class="field full"><label>Mensaje para el cliente (opcional)</label><textarea class="input" id="cb-n" placeholder="Ej.: Llegamos 30 min antes para instalar."></textarea></div>
+      </div></div>`,
+    foot: '<button class="btn ghost" data-close>Volver</button><button class="btn ok" id="cb-ok">' + icon('check', 'sm') + ' Confirmar y avisar</button>',
+    onMount: (el, m) => {
+      const x = el.querySelector('#cb-x'), t = el.querySelector('#cb-t');
+      const paint = () => (t.textContent = money(calcTotal(b.items, b.start, b.end, x.value), CUR));
+      x.oninput = paint; paint();
+      el.querySelector('#cb-ok').onclick = async () => {
+        const extra = Math.max(0, +x.value || 0);
+        try {
+          await api.updateBooking(b.id, { status: 'confirmado', adminNote: el.querySelector('#cb-n').value.trim(), extra, total: calcTotal(b.items, b.start, b.end, extra) });
+          m.close(); toast('Reserva confirmada', `${b.clientName} ya fue notificado.`, 'ok');
+        } catch (err) { toast('No se pudo confirmar', err.message, 'bad'); }
+      };
+    },
+  });
+}
+
 function editSchedule(b) {
   modal({
     title: 'Cambiar horario',
@@ -345,7 +400,7 @@ function editSchedule(b) {
         const d = el.querySelector('#es-d').value, s = el.querySelector('#es-s').value, e = el.querySelector('#es-e').value;
         if (!d || !s || !e) return toast('Completa fecha y horas', '', 'bad');
         const start = toMs(d, s); let end = toMs(d, e); if (end <= start) end += 864e5;
-        try { await api.updateBooking(b.id, { start, end, reminded1d: false, reminded15m: false }); m.close(); toast('Horario actualizado', '', 'ok'); }
+        try { await api.updateBooking(b.id, { start, end, total: calcTotal(b.items, start, end, b.extra), reminded1d: false, reminded15m: false }); m.close(); toast('Horario actualizado', '', 'ok'); }
         catch (err) { toast('No se pudo guardar', err.message, 'bad'); }
       };
     },
@@ -407,9 +462,7 @@ function vPanel(el) {
   el.querySelectorAll('[data-q]').forEach((btn) => btn.onclick = async () => {
     const b = S.bookings.find((x) => x.id === btn.dataset.id);
     if (btn.dataset.q === 'confirm') {
-      if (conflictsOf(b).length && !(await confirmDialog({ title: 'Se cruza con otra reserva', text: 'Ya tienes un trabajo confirmado en ese horario. ¿Confirmar igual?', ok: 'Confirmar igual' }))) return;
-      await api.updateBooking(b.id, { status: 'confirmado', adminNote: '' });
-      toast('Reserva confirmada', `${b.clientName} fue notificado.`, 'ok');
+      confirmBooking(b);
     } else {
       const note = await confirmDialog({ title: '¿No puedes atender esta reserva?', ok: 'Avisar al cliente', danger: true, input: { label: 'Motivo / alternativa (opcional)' } });
       if (note === null) return;
@@ -590,7 +643,9 @@ function editService(s = null) {
       <div class="field"><label>Precio (${CUR})</label><input class="input" id="sv-p" type="number" min="0" step="1" value="${s?.price ?? ''}"></div>
       <div class="field"><label>Unidad</label><input class="input" id="sv-u" value="${esc(s?.unit || 'por alquiler')}" placeholder="por alquiler, por hora, por día…"></div>
       <div class="field full"><label>Fotos</label><div id="sv-ph"></div><span class="hint">La primera foto es la portada.</span></div>
-      <label class="row full small strong"><input type="checkbox" id="sv-a" ${s?.active === false ? '' : 'checked'}> Visible para los clientes</label></div>`,
+      <label class="row full small strong"><input type="checkbox" id="sv-h" ${s?.perHour ? 'checked' : ''}> El precio es por hora (se multiplica por las horas reservadas)</label>
+      <label class="row full small strong"><input type="checkbox" id="sv-a" ${s?.active === false ? '' : 'checked'}> Visible para los clientes</label>
+      <p class="full tiny muted">Deja el precio en 0 para que diga "Consultar precio".</p></div>`,
     foot: `${s ? `<button class="btn danger-soft" id="sv-del" style="margin-right:auto">${icon('trash', 'sm')} Eliminar</button>` : ''}<button class="btn ghost" data-close>Cancelar</button><button class="btn" id="sv-ok">Guardar</button>`,
     onMount: (el, m) => {
       photosEditor(el.querySelector('#sv-ph'), photos);
@@ -598,7 +653,7 @@ function editService(s = null) {
         const name = el.querySelector('#sv-n').value.trim();
         if (!name) return toast('Escribe el nombre del servicio', '', 'bad');
         try {
-          await api.saveService({ ...(s ? { id: s.id } : {}), name, description: el.querySelector('#sv-d').value.trim(), price: +el.querySelector('#sv-p').value || 0, unit: el.querySelector('#sv-u').value.trim(), photos, active: el.querySelector('#sv-a').checked });
+          await api.saveService({ ...(s ? { id: s.id } : {}), name, description: el.querySelector('#sv-d').value.trim(), price: +el.querySelector('#sv-p').value || 0, unit: el.querySelector('#sv-u').value.trim(), perHour: el.querySelector('#sv-h').checked, photos, active: el.querySelector('#sv-a').checked });
           m.close(); toast('Servicio guardado', '', 'ok');
         } catch (err) { toast('No se pudo guardar', err.message, 'bad'); }
       };
@@ -745,7 +800,7 @@ function showService(s) {
   if (!s) return;
   modal({
     title: esc(s.name), wide: true,
-    body: `${s.photos?.length ? `<div class="photos-edit" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${s.photos.map((p, i) => `<div class="ph-item" data-i="${i}" style="cursor:zoom-in"><img src="${esc(p)}" alt=""></div>`).join('')}</div>` : `<div class="svc-media ${toneOf(s)}" style="border-radius:16px"><div class="ph">${icon('projector')}</div></div>`}
+    body: `${s.photos?.length ? `<div class="photos-edit" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${s.photos.map((p, i) => `<div class="ph-item" data-i="${i}" style="cursor:zoom-in"><img src="${esc(p)}" alt=""></div>`).join('')}</div>` : `<div class="svc-media ${toneOf(s)}" style="border-radius:16px"><div class="ph">${icon(s.icon || 'projector')}</div></div>`}
       <p style="margin-top:16px">${esc(s.description)}</p><p class="price" style="margin-top:12px">${priceTag(s)}</p>`,
     foot: `<button class="btn ghost" data-close>Cerrar</button><a class="btn" href="#/reservar?s=${s.id}" data-close>${icon('calPlus', 'sm')} Reservar este servicio</a>`,
     onMount: (el) => el.querySelectorAll('[data-i]').forEach((x) => x.onclick = () => lightbox(s.photos, +x.dataset.i, s.name)),
@@ -774,16 +829,19 @@ function vReservar(el, params) {
   if (pre && svcById(pre) && !W.qty[pre]) { W.qty[pre] = 1; history.replaceState(null, '', '#/reservar'); }
   let pickMap = null;
 
-  const items = () => Object.entries(W.qty).filter(([, q]) => q > 0).map(([id, qty]) => { const s = svcById(id); return s && { serviceId: id, name: s.name, price: s.price || 0, qty }; }).filter(Boolean);
-  const total = () => items().reduce((t, i) => t + i.price * i.qty, 0);
+  const items = () => Object.entries(W.qty).filter(([, q]) => q > 0).map(([id, qty]) => { const s = svcById(id); return s && { serviceId: id, name: s.name, price: s.price || 0, qty, ...(s.perHour ? { perHour: true } : {}) }; }).filter(Boolean);
+  const total = () => calcTotal(items(), startMs(), endMs());
   const startMs = () => (W.date && W.start ? toMs(W.date, W.start) : null);
   const endMs = () => { if (!W.date || !W.end) return null; let e = toMs(W.date, W.end); if (e <= startMs()) e += 864e5; return e; };
 
   const summary = () => `<div class="card pad summary"><h3 style="margin-bottom:10px">Resumen</h3>
-    ${items().length ? items().map((i) => `<div class="line"><span>${i.qty} × ${esc(i.name)}</span><span class="muted">${lineMoney(i)}</span></div>`).join('') : '<p class="small muted">Elige al menos un servicio.</p>'}
+    ${items().length ? items().map((i) => `<div class="line"><span>${i.qty} × ${esc(i.name)}</span><span class="muted">${lineMoney(i, hoursOf(startMs(), endMs()))}</span></div>`).join('') : '<p class="small muted">Elige al menos un servicio.</p>'}
     ${startMs() ? `<div class="line" style="margin-top:6px"><span class="muted">${icon('calendar', 'sm')}</span><span style="text-align:right">${dayLong(startMs())}<br>${time(startMs())}${endMs() ? ` – ${time(endMs())}` : ''}</span></div>` : ''}
     ${W.location ? `<div class="line"><span class="muted">${icon('pin', 'sm')}</span><span style="text-align:right">${esc(W.location.address || `${W.location.lat}, ${W.location.lng}`)}</span></div>` : ''}
+    ${W.location && kmFromBase(W.location) != null ? `<div class="line"><span class="muted">Distancia</span><span>${kmText(W.location)}</span></div>` : ''}
     <div class="line total"><span>Total referencial</span><span>${money(total(), CUR)}</span></div>
+    ${hasConsult(items()) ? '<p class="tiny muted">Los extras "a consultar" se suman al confirmar.</p>' : ''}
+    <p class="tiny" style="margin-top:6px;color:var(--pending);font-weight:600">+ Recargo por distancia según la zona (te lo indicamos al confirmar).</p>
     <p class="tiny muted" style="margin-top:8px">No pagas nada ahora. Te confirmamos disponibilidad y precio final por la app o WhatsApp.</p></div>`;
 
   const quickDates = () => {
@@ -795,7 +853,7 @@ function vReservar(el, params) {
 
   const stepBody = () => {
     if (W.step === 1) return `<div class="col">${S.services.filter((s) => s.active !== false).map((s, i) => `<div class="pick ${W.qty[s.id] ? 'on' : ''}">
-        <div class="thumb">${s.photos?.[0] ? `<img src="${esc(s.photos[0])}" alt="">` : `<div class="ph ${toneOf(s, i)}" style="position:absolute;inset:0;display:grid;place-items:center;color:#fff">${icon('projector')}</div>`}</div>
+        <div class="thumb">${s.photos?.[0] ? `<img src="${esc(s.photos[0])}" alt="">` : `<div class="ph ${toneOf(s, i)}" style="position:absolute;inset:0;display:grid;place-items:center;color:#fff">${icon(s.icon || 'projector')}</div>`}</div>
         <div style="min-width:0"><b class="strong">${esc(s.name)}</b><div class="small muted" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(s.description)}</div><div class="price" style="font-size:15px;margin-top:2px">${priceTag(s)}</div></div>
         <div class="stepper"><button type="button" data-dec="${s.id}" aria-label="Menos">−</button><input inputmode="numeric" data-qty="${s.id}" value="${W.qty[s.id] || 0}"><button type="button" data-inc="${s.id}" aria-label="Más">+</button></div></div>`).join('') || emptyBox('box', 'No hay servicios disponibles', 'Vuelve más tarde.')}</div>`;
     if (W.step === 2) return `<div class="card pad col">
@@ -888,7 +946,7 @@ function vReservar(el, params) {
     try {
       const id = await api.createBooking({
         clientName: W.name.trim(), clientPhone: W.phone.trim(), clientEmail: S.user.email || '',
-        items: items(), total: total(), start: startMs(), end: endMs(),
+        items: items().map((i) => (i.perHour ? { ...i, hours: hoursOf(startMs(), endMs()) } : i)), total: total(), extra: 0, start: startMs(), end: endMs(),
         location: { lat: W.location.lat, lng: W.location.lng, address: W.location.address, reference: W.reference.trim() },
         notes: W.notes.trim(),
       });

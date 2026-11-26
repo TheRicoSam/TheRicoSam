@@ -90,7 +90,7 @@ export function diffBookings(prev, next, user) {
       if (!o && b.status === 'pendiente') notify('Nueva solicitud de reserva', `${b.clientName} · ${dayLong(b.start)} ${time(b.start)}`, { tag: `new-${b.id}`, url: `#/reserva/${b.id}` });
       else if (o && o.status !== b.status && b.status === 'cancelado') notify('Reserva cancelada por el cliente', `${b.clientName} · ${dayLong(b.start)}`, { tag: `st-${b.id}`, url: `#/reserva/${b.id}`, kind: 'bad' });
     } else if (o && o.status !== b.status) {
-      if (b.status === 'confirmado') notify('¡Tu reserva está confirmada! ✅', `${dayLong(b.start)} a las ${time(b.start)}${b.adminNote ? ` · ${b.adminNote}` : ''}`, { tag: `st-${b.id}`, url: `#/reserva/${b.id}`, kind: 'ok' });
+      if (b.status === 'confirmado') notify('¡Tu reserva está confirmada! ✅', `${dayLong(b.start)} a las ${time(b.start)}${b.total ? ` · Total: Bs ${b.total}` : ''}${b.adminNote ? ` · ${b.adminNote}` : ''}`, { tag: `st-${b.id}`, url: `#/reserva/${b.id}`, kind: 'ok' });
       else if (b.status === 'rechazado') notify('No hay disponibilidad para tu fecha', b.adminNote || 'Escríbenos para buscar otra fecha u horario.', { tag: `st-${b.id}`, url: `#/reserva/${b.id}`, kind: 'bad' });
       else if (b.status === 'completado') notify('Servicio completado', '¡Gracias por confiar en nosotros!', { tag: `st-${b.id}`, url: `#/reserva/${b.id}` });
     } else if (o && o.start !== b.start && user.role !== 'admin') {

@@ -38,6 +38,8 @@ const P = {
   tent: '<path d="M3.5 21 14 3M20.5 21 10 3M15.5 21 12 15l-3.5 6M2 21h20"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
   send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
+  laptop: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/>',
+  cable: '<path d="M4 9a2 2 0 0 1-2-2V5h6v2a2 2 0 0 1-2 2zM3 3v2M7 3v2M5 9v4a4 4 0 0 0 8 0V9a4 4 0 0 1 8 0v6"/><path d="M18 21v-2a1 1 0 0 1-1-1v-1a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1v2"/>',
   projector: '<rect x="2" y="7" width="20" height="11" rx="2.5"/><circle cx="15.5" cy="12.5" r="3"/><path d="M5.5 10.5h4M5.5 13.5h4M6 18v2M18 18v2"/>',
 };
 

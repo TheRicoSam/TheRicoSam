@@ -70,7 +70,7 @@ exports.cambioReserva = onDocumentUpdated('bookings/{id}', async (e) => {
   const a = e.data.before.data(), b = e.data.after.data(), id = e.params.id;
   const url = `#/reserva/${id}`, tag = `st-${id}`;
   if (a.status !== b.status) {
-    if (b.status === 'confirmado') await send([b.uid], { title: '¡Tu reserva está confirmada! ✅', body: `${when(b.start)}${b.adminNote ? ` · ${b.adminNote}` : ''}`, url, tag });
+    if (b.status === 'confirmado') await send([b.uid], { title: '¡Tu reserva está confirmada! ✅', body: `${when(b.start)}${b.total ? ` · Total: Bs ${b.total}` : ''}${b.adminNote ? ` · ${b.adminNote}` : ''}`, url, tag });
     if (b.status === 'rechazado') await send([b.uid], { title: 'No hay disponibilidad para tu fecha', body: b.adminNote || 'Escríbenos para buscar otra fecha u horario.', url, tag });
     if (b.status === 'cancelado') await send(await adminUids(), { title: 'Reserva cancelada por el cliente', body: `${b.clientName} · ${when(b.start)}`, url, tag });
   } else if (a.start !== b.start) {

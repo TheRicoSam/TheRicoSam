@@ -19,6 +19,13 @@ Una sola app web para el dueño y sus clientes. Se puede instalar en el celular 
 - **Trabajos realizados**: subir fotos de eventos pasados para que los clientes las vean.
 - Avisos de cada nueva solicitud, más los recordatorios de 1 día y 15 minutos.
 
+## Precios
+
+- **Data (proyector): 34 Bs por hora.** La app multiplica por las horas reservadas y cobra la hora empezada (de 14:00 a 16:30 son 3 h = 102 Bs).
+- **Recargo por distancia:** al confirmar, la app te muestra a cuántos km (en línea recta) está el lugar desde tu base, y tú escribes el recargo. El cliente recibe el total final.
+- **Laptop y cable HDMI largo:** aparecen como "Consultar precio" hasta que les pongas precio en **Servicios › Editar**. Ahí también puedes marcar si un precio es por hora.
+- **Tu base:** en `firebase-config.js` › `base` pon las coordenadas de donde sales (ahora está la Plaza 14 de Septiembre). Para sacarlas, mantén presionado tu lugar en Google Maps y copia los dos números.
+
 ## Probarla ya (modo demo)
 
 Sin configurar nada, la app arranca en **modo demo**: los datos quedan solo en ese navegador.
